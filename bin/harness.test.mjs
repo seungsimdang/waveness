@@ -2,7 +2,7 @@
 // 실행: node --test bin/*.test.mjs
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -78,6 +78,25 @@ test("처음 받기 후 양방향 자동 동기화에서 프로젝트 전용 변
 
     // 다시 실행해도 이미 올린 커밋은 건너뜀
     assert.doesNotMatch(run(hub, "auto", project), /올리기: 커밋/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("프로젝트에서 실행 권한만 바꾼 범용 파일도 권한을 올림", () => {
+  const { root, hub, project } = setup();
+  try {
+    run(hub, "pull", project);
+    git(project, "add", "-A");
+    commit(project, "chore: 하네스 연결", "Harness-Scope: sync");
+    chmodSync(join(project, "docs/agent-rules/git-safety.md"), 0o755);
+    git(project, "add", "docs/agent-rules/git-safety.md");
+    commit(project, "chore: 실행 권한", "Harness-Scope: generic");
+
+    assert.match(run(hub, "auto", project), /올리기: 커밋 1개/);
+    const pushed = join(root, "check");
+    git(root, "clone", "-q", join(root, "remote.git"), pushed);
+    assert.equal(git(pushed, "ls-tree", "HEAD", "harness/docs/agent-rules/git-safety.md").split(" ")[0], "100755");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -330,6 +349,27 @@ test("seungness 훅 동기화는 양쪽 변경을 3-way 병합해 두 저장소�
     git(up, "push", "-q", "origin", "HEAD:main");
     assert.match(sync(), /seungness에서 훅·등록 파일 1개 받음/);
     assert.equal(existsSync(join(hub, "harness/.claude/hooks/c.sh")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("seungness 훅 동기화는 내용이 같고 실행 권한만 다른 훅도 맞추고 수정한 실행 훅의 권한을 유지함", () => {
+  const { root, up, hub, sync } = setupUpstream();
+  const mode = (dir) => git(dir, "ls-tree", "HEAD", "harness/.claude/hooks/a.sh").split(" ")[0];
+  try {
+    chmodSync(join(hub, "harness/.claude/hooks/a.sh"), 0o755);
+    git(hub, "add", ".");
+    commit(hub, "chore: a 실행 권한");
+    assert.match(sync(), /seungness로 훅·등록 파일 1개 올림/);
+    assert.equal(mode(up), "100755");
+    assert.equal(git(hub, "status", "--porcelain"), "");
+
+    writeFileSync(join(hub, "harness/.claude/hooks/a.sh"), "1\n2\n3\n4\n5 waveness\n");
+    git(hub, "add", ".");
+    commit(hub, "fix: a 수정");
+    assert.match(sync(), /seungness로 훅·등록 파일 1개 올림/);
+    assert.equal(mode(up), "100755");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

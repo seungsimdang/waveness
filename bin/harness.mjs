@@ -79,10 +79,11 @@ function isLink(file) {
 function readWorking(file) {
   if (isLink(file)) return { mode: "120000", data: Buffer.from(readlinkSync(file)) };
   if (!existsSync(file)) return null;
-  return { mode: null, data: readFileSync(file) };
+  // 실행 권한까지 읽어 두어야 apply가 755를 되살리고 same이 권한만 다른 파일을 변경으로 봄
+  return { mode: statSync(file).mode & 0o111 ? "100755" : "100644", data: readFileSync(file) };
 }
 
-const same = (a, b) => (a && b ? a.data.equals(b.data) : !a && !b);
+const same = (a, b) => (a && b ? a.mode === b.mode && a.data.equals(b.data) : !a && !b);
 
 // ours(작업 트리 파일)에 base→theirs 변경을 반영할 계획을 만듦. 파일은 apply에서만 씀
 function plan(file, base, theirs) {
