@@ -1,0 +1,8 @@
+#!/bin/sh
+# 커밋 직후 seungness 훅 동기화. 커밋을 기다리게 하지 않으려고 백그라운드로 실행하고 결과는 .git/harness-sync.log에 기록
+# 동기화 자체가 만든 커밋에서 다시 불려도 잠금(withLock)으로 건너뜀
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+root=$(git rev-parse --show-toplevel) || exit 0
+log="$(git rev-parse --git-common-dir)/harness-sync.log"
+(date '+%F %T' && node "$root/bin/harness.mjs" upstream 2>&1) >>"$log" &
+exit 0

@@ -1,0 +1,21 @@
+# 공용 하네스(waveness) 동기화 대상. `/`로 끝나면 하위 전체, `!`로 시작하면 제외(프로젝트 소유). 프로젝트 전용 규칙 파일은 이 파일 끝에 `!` 줄로 추가
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/agents/
+.claude/hooks/
+.claude/rules/
+.claude/settings.json
+.claude/skills/
+.codex/
+.harness/
+artifacts/README.md
+artifacts/feature-team/README.md
+artifacts/work/README.md
+artifacts/work/work-item-template.md
+docs/agent-contracts/
+docs/agent-harness/
+docs/agent-rules/
+!docs/agent-rules/project.md
+!docs/agent-harness/CHANGELOG.md
+!.harness/lock.json

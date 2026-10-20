@@ -1,0 +1,14 @@
+# seungness와 양방향 동기화하는 harness/ 기준 경로. `/`로 끝나면 하위 전체, `!`로 시작하면 waveness 전용(seungness로 올리지 않음)
+.claude/hooks/
+.codex/hooks/
+!.claude/hooks/check-agent-harness-sync.sh
+!.claude/hooks/check-branch-guard.sh
+!.claude/hooks/check-prd-claim-citation.sh
+!.claude/hooks/check-review-findings-relayed.sh
+!.claude/hooks/check-tailwind-source-exclusion.sh
+!.claude/hooks/remind-skill-name-in-prompt.sh
+!.claude/hooks/require-figma-visual-verification.sh
+!.codex/hooks/check-agent-harness-sync.sh
+!.codex/hooks/check-branch-guard.sh
+!.codex/hooks/check-tailwind-source-exclusion.sh
+!.codex/hooks/require-figma-visual-verification.sh

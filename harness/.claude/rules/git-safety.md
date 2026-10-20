@@ -1,0 +1,1 @@
+../../docs/agent-rules/git-safety.md
