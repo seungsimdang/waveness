@@ -8,7 +8,7 @@
 
 ## 규칙
 
-- 기본 브랜치(`main`·`master`·통합 브랜치)에서 직접 파일을 편집하지 않는다. `check-branch-guard.sh`가 `main`·`master` 편집을 차단한다.
+- 기본 브랜치(`main`·`master`·통합 브랜치)에서 직접 파일을 편집하지 않는다. hotfix도 예외 없이 별도 브랜치를 쓴다. `check-branch-guard.sh`가 `main`·`master` 편집을 차단한다.
 - 티켓 번호가 없으면 브랜치명을 짓지 않고 사용자에게 티켓 번호 또는 브랜치명을 묻는다.
 - 작업 브랜치는 PR로 통합 브랜치에 병합한다. 병합·push는 사용자가 지시할 때만 한다.
 - 커밋 메시지와 1 branch 1 commit 여부는 `itd-commit` Skill과 `project.md`의 커밋 절을 따른다.

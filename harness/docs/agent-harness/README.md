@@ -2,7 +2,7 @@
 
 ## 시작점과 명세
 
-Codex는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시작한다. Feature Team 역할 3개(spec-planner·implementer·integration-reviewer)와 스킬 6종은 절차·책임·금지사항·산출물 계약을 갖춘다.
+Codex는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시작한다. Feature Team 역할 4개(prior-art-researcher·spec-planner·implementer·integration-reviewer)와 스킬 6종은 절차·책임·금지사항·산출물 계약을 갖춘다.
 
 ## 원본과 동기화
 
@@ -21,7 +21,7 @@ Codex는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시�
 - SessionStart(`startup`) 훅은 `.harness/sync.sh session`으로 공용 하네스와 양방향 동기화한다.
 - Claude·Codex 런타임 훅은 각 도구의 등록 구조(`.claude/settings.json`, `.codex/hooks.json`)를 유지한다. Codex Edit|Write 훅은 `.codex/hooks/codex-tool-adapter.mjs`를 거쳐 실행한다. Codex에 대응 도구가 없는 AskUserQuestion·EnterWorktree·Agent 관련 훅과 transcript를 읽는 Stop 훅(`judge-unverified-claims`, `check-prd-claim-citation`, `check-review-findings-relayed`)은 Claude에만 둔다.
 - seungness에서 받은 훅 중 `enforce-commit-msg-style.sh`·`block-attribution-trailers.sh`의 차단 메시지는 seungness의 `git-commit` 스킬 경로를 가리킨다. 이 하네스의 커밋 형식은 `itd-commit`이며, 두 훅이 검사하는 규칙(종결어미·em-dash·임의 줄바꿈·트레일러 금지)은 `itd-commit`과 같다.
-- 프런트엔드 전용 훅: `check-branch-guard.sh`(main·master 편집 차단), `require-figma-visual-verification.sh`(Figma 구현 후 브라우저 실측 없이 종료 차단), `check-tailwind-source-exclusion.sh`, `check-agent-harness-sync.sh`(Claude·Codex 짝 미수정 안내), `remind-skill-name-in-prompt.sh`, `check-prd-claim-citation.sh`(PRD 언급 시 `PRD.md:줄` 인용 요구), `check-review-findings-relayed.sh`(`03-review.md`의 확인 못한 부분 전달 요구).
+- 프런트엔드 전용 훅: `check-branch-guard.sh`(main·master 편집 차단), `require-figma-visual-verification.sh`(Figma 구현 후 브라우저 실측 없이 종료 차단), `check-tailwind-source-exclusion.sh`, `check-agent-harness-sync.sh`(Claude·Codex 짝 미수정 안내), `remind-skill-name-in-prompt.sh`, `check-prd-claim-citation.sh`(PRD 언급 시 `PRD.md:줄` 인용 요구), `check-review-findings-relayed.sh`(`04-review.md`의 확인 못한 부분 전달 요구).
 - `block-comment-line-wrap.sh`는 프로젝트의 `scripts/check-comment-line-breaks.mjs`가 있을 때만 검사한다.
 
 런타임 훅은 사용자 승인·판단·발언 전체를 보장하지 않는다. 훅 등록과 입력 기반 검증은 실제 Claude·Codex 런타임 실행 검증과 구분한다.

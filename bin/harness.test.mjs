@@ -13,6 +13,8 @@ const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ENV = {
   ...process.env,
   GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t",
+  // commit·push 뒤 분리 실행되는 git maintenance가 임시 저장소 삭제 중에 파일을 만들어 rmSync가 ENOTEMPTY로 실패하므로 끔
+  GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "maintenance.auto", GIT_CONFIG_VALUE_0: "false",
 };
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, env: ENV }).toString().trim();
 const commit = (cwd, ...messages) => git(cwd, "commit", "-q", ...messages.flatMap((m) => ["-m", m]));

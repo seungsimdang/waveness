@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop 훅: 이번 턴(가장 최근 실제 사용자 입력 이후)에 artifacts/feature-team/03-review.md를
+# Stop 훅: 이번 턴(가장 최근 실제 사용자 입력 이후)에 artifacts/feature-team/04-review.md를
 # Read/Edit/Write했다면, 그 파일의 "확인 못한 부분"/"사람 승인 필요" 섹션 불릿의 리드텀
 # (**볼드**/`코드` 로 감싼 첫 구절)이 이번 턴 assistant 텍스트 어딘가에 등장하는지 확인한다.
 # "치명적 발견"에만 집중해 이 두 섹션 항목을 사용자에게 통째로 누락 보고한 사고 재발 방지용.
@@ -14,7 +14,7 @@ transcript_path=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/de
 [ -z "$transcript_path" ] && exit 0
 [ -f "$transcript_path" ] || exit 0
 
-review_file="${CLAUDE_PROJECT_DIR:-.}/artifacts/feature-team/03-review.md"
+review_file="${CLAUDE_PROJECT_DIR:-.}/artifacts/feature-team/04-review.md"
 [ -f "$review_file" ] || exit 0
 
 last_idx=$(jq -rs '
@@ -27,11 +27,11 @@ last_idx=$(jq -rs '
 
 [ -z "$last_idx" ] && last_idx=-1
 
-# 이번 턴에 03-review.md를 Read/Edit/Write로 건드렸는지 확인
+# 이번 턴에 04-review.md를 Read/Edit/Write로 건드렸는지 확인
 touched_review=$(jq -rs --argjson idx "$last_idx" '
 	.[($idx + 1):]
 	| [ .[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") ]
-	| any(((.input.file_path // "") | test("artifacts/feature-team/03-review\\.md")))
+	| any(((.input.file_path // "") | test("artifacts/feature-team/04-review\\.md")))
 ' "$transcript_path" 2>/dev/null)
 
 [ "$touched_review" = "true" ] || exit 0
@@ -71,7 +71,7 @@ EOF
 done
 
 if [ -n "$missing" ]; then
-	reason=$(printf '03-review.md를 읽었지만 다음 항목이 이번 턴 응답 텍스트에서 보이지 않음(문구 그대로일 필요는 없지만 언급이 전혀 없으면 안 됨) - 치명적 발견뿐 아니라 이 항목들도 사용자에게 직접 전달할 것:%b' "$missing")
+	reason=$(printf '04-review.md를 읽었지만 다음 항목이 이번 턴 응답 텍스트에서 보이지 않음(문구 그대로일 필요는 없지만 언급이 전혀 없으면 안 됨) - 치명적 발견뿐 아니라 이 항목들도 사용자에게 직접 전달할 것:%b' "$missing")
 	jq -n --arg reason "$reason" '{decision: "block", reason: $reason}'
 	exit 0
 fi
