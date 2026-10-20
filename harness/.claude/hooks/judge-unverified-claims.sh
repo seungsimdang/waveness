@@ -16,6 +16,8 @@ import json, os, re, subprocess, sys
 
 MAX_BLOCKS = 2
 MAX_RESULT_CHARS = 1500
+MAX_MATCH_CHARS = 3000
+MAX_LINE_CHARS = 400
 MAX_EVIDENCE_CHARS = 24000
 JUDGE_TIMEOUT_SECONDS = 60
 
@@ -45,11 +47,20 @@ def prompt_text(entry):
         content = "\n".join(part.get("text", "") for part in content if isinstance(part, dict))
     return str(content or "")[-MAX_EVIDENCE_CHARS:]
 
+# 긴 결과를 앞부분만 넘기면 응답이 인용한 줄이 잘려 근거 없음으로 오판하므로, 응답에 나온 파일명·백틱 표기가 든 뒷부분 줄을 함께 넘김
+keys = set(re.findall(r"`([^`\n]{3,80})`", answer)) | set(re.findall(r"[\w.-]+\.(?:sh|mjs|js|ts|tsx|json|md|toml|py|css|ya?ml)\b", answer))
+keys = {k for k in (re.sub(r":[\d,-]+$", "", key) for key in keys) if len(k) >= 3}
+
 def block_text(block):
     content = block.get("content")
     if isinstance(content, list):
         content = "\n".join(part.get("text", "") for part in content if isinstance(part, dict))
-    return str(content or "")[:MAX_RESULT_CHARS]
+    text = str(content or "")
+    if len(text) <= MAX_RESULT_CHARS:
+        return text
+    hits = [line[:MAX_LINE_CHARS] for line in text[MAX_RESULT_CHARS:].splitlines() if any(key in line for key in keys)]
+    matched = "\n".join(hits)[:MAX_MATCH_CHARS]
+    return text[:MAX_RESULT_CHARS] + ("\n[...중략. 이후 줄 중 응답이 인용한 이름이 든 줄...]\n" + matched if matched else "\n[...이후 생략...]")
 
 # transcript를 끝에서부터 읽어 마지막 실제 사용자 메시지 이후의 도구 호출과 결과만 모음
 turn_id = "unknown"
