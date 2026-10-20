@@ -1,5 +1,5 @@
 #!/bin/sh
-# PreToolUse(Bash) 훅: git commit 메시지가 .claude/skills/git-commit/SKILL.md의 기계적으로 검증 가능한 규칙을 지키는지 확인.
+# PreToolUse(Bash) 훅: git commit 메시지가 .claude/skills/itd-commit/SKILL.md의 기계적으로 검증 가능한 규칙을 지키는지 확인.
 # 대화 중 다짐이 아니라 훅으로 강제하기 위해 도입
 #
 # 여기서 강제하는 것 (SKILL.md 중 grep/awk로 기계적으로 판정 가능한 항목만):
@@ -100,7 +100,7 @@ if [ -z "$fail_reason" ]; then
 fi
 
 if [ -n "$fail_reason" ]; then
-  echo "차단: 커밋 메시지가 .claude/skills/git-commit/SKILL.md 규칙을 위반합니다." >&2
+  echo "차단: 커밋 메시지가 .claude/skills/itd-commit/SKILL.md 규칙을 위반합니다." >&2
   echo "→ $fail_reason" >&2
   exit 2
 fi
