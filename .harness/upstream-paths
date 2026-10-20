@@ -7,8 +7,10 @@
 !.claude/hooks/check-review-findings-relayed.sh
 !.claude/hooks/check-tailwind-source-exclusion.sh
 !.claude/hooks/remind-skill-name-in-prompt.sh
+!.claude/hooks/require-coderabbit-run.sh
 !.claude/hooks/require-figma-visual-verification.sh
 !.codex/hooks/check-agent-harness-sync.sh
 !.codex/hooks/check-branch-guard.sh
 !.codex/hooks/check-tailwind-source-exclusion.sh
+!.codex/hooks/require-coderabbit-run.sh
 !.codex/hooks/require-figma-visual-verification.sh

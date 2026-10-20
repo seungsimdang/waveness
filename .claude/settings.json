@@ -113,10 +113,6 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/block-comment-line-wrap.sh\""
-          },
-          {
-            "type": "command",
-            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-coderabbit-run.sh\""
           }
         ]
       },
