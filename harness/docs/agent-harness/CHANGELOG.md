@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-10-20 기획서 인용 점검 훅의 경로 언급 오탐 수정
+
+- 대상: `.claude/hooks/check-prd-claim-citation.sh`
+- 내용: 줄번호 없는 파일 경로(`src/docs/PRD.md` 등)로만 기획서를 언급한 줄까지 근거 누락으로 차단하던 오탐을 제외했다. 경로를 쓰면서 내용을 주장하는 줄도 함께 빠지는 한계가 있다.
+
 ## 2026-10-20 허브 저장소에도 하네스 적용
 
 - 대상: waveness 루트 `.claude/settings.json`·`.codex/hooks.json`·`AGENTS.md`·`CLAUDE.md`, `bin/hub-hooks.mjs`, `.codex/hooks/check-agent-harness-sync.sh`

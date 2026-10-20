@@ -29,9 +29,11 @@ last_text=$(jq -rs --argjson idx "$last_idx" '
 
 [ -z "$last_text" ] && exit 0
 
+# 줄번호 없는 파일 경로(`src/docs/PRD.md` 등)로만 언급한 줄은 내용 주장이 아니라 제외. 경로로 내용을 주장하는 줄도 함께 빠지는 한계가 있음
 violations=$(printf '%s\n' "$last_text" \
 	| grep 'PRD' \
 	| grep -Ev 'PRD\.md:[0-9]|PRD 미정' \
+	| awk '{ t = $0; gsub(/[^ \t`|(]*PRD\.md/, "", t); if (t ~ /PRD/) print }' \
 	| head -5)
 
 [ -z "$violations" ] && exit 0
