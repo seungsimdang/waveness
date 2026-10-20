@@ -1,5 +1,13 @@
 # 하네스 변경 이력
 
+## 2026-10-20 feat/ITD-7509 공용 구현·검증 지침 정리
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@be7c5eb27300c8ac4fcf51681bcc4843777419d3`
+
+> - 구현·검증 역할의 중복 지침과 절차 번호 정리
+> - hover 검증·서버 종료·실측 근거 기록 지침 보완
+> - Claude·Codex 검증자 역할 본문 일치
+
 ## 2026-10-20 미검증 주장 판정 훅의 긴 출력 잘림 오탐 수정
 
 - 대상: `.claude/hooks/judge-unverified-claims.sh`
