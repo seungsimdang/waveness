@@ -390,6 +390,8 @@ function planHookConfigs(up, synced, head, include) {
       const found = blob(repo, rev, PREFIX + path);
       return found ? JSON.parse(found.data) : null;
     };
+    // 다시 쓸 때 저장소마다 기존 들여쓰기 유지(waveness는 프로젝트 Biome 포맷의 탭, seungness는 공백 2칸)
+    const indent = (repo) => (/\n\t/.test(readFileSync(join(repo, PREFIX, path), "utf8")) ? "\t" : 2);
     const ours = read(HUB, "HEAD");
     const theirs = read(up, head);
     if (!ours || !theirs) continue;
@@ -400,7 +402,7 @@ function planHookConfigs(up, synced, head, include) {
     for (const [repo, config, list] of [[HUB, ours, steps.toHub], [up, theirs, steps.toUp]]) {
       const hooks = rebuildHooks(config.hooks ?? {}, merged, isShared);
       if (JSON.stringify(hooks) === JSON.stringify(config.hooks ?? {})) continue;
-      const data = Buffer.from(`${JSON.stringify({ ...config, hooks }, null, 2)}\n`);
+      const data = Buffer.from(`${JSON.stringify({ ...config, hooks }, null, indent(repo))}\n`);
       list.push({ file: join(repo, PREFIX, path), entry: { mode: "100644", data } });
     }
   }

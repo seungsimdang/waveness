@@ -272,7 +272,7 @@ function setupUpstream() {
   });
   const hub = repo("waveness", {
     ...hooks,
-    "harness/.claude/settings.json": settings({ permissions: { allow: ["Edit(artifacts/feature-team/**)"] } }),
+    "harness/.claude/settings.json": settings({ permissions: { allow: ["Edit(artifacts/feature-team/**)"] } }).replaceAll("  ", "\t"),
     "harness/.claude/hooks/only.sh": "전용\n",
     ".harness/upstream-paths": "# 주석\n.claude/hooks/\n.codex/hooks/\n!.claude/hooks/only.sh\n",
     ".harness/upstream.json": `${JSON.stringify({ synced: git(up, "rev-parse", "HEAD") })}\n`,
@@ -368,7 +368,7 @@ test("seungness 훅 동기화는 훅 등록을 항목 단위로 주고받고 전
   const edit = (dir, change) => {
     const config = JSON.parse(read(dir, file));
     change(config.hooks);
-    writeFileSync(join(dir, file), `${JSON.stringify(config, null, 2)}\n`);
+    writeFileSync(join(dir, file), `${JSON.stringify(config, null, dir === hub ? "\t" : 2)}\n`);
   };
   try {
     // seungness: Stop 등록 추가 / waveness: 새 공유 훅과 전용 훅 등록 추가
@@ -387,6 +387,7 @@ test("seungness 훅 동기화는 훅 등록을 항목 단위로 주고받고 전
     assert.deepEqual(hubConfig.hooks.PreToolUse[0].hooks, [hookCommand("a.sh"), hookCommand("c.sh"), hookCommand("only.sh")]);
     for (const config of [upConfig, hubConfig]) assert.deepEqual(config.hooks.Stop, [{ hooks: [hookCommand("a.sh")] }]);
     assert.equal(upConfig.language, "korean");
+    assert.ok(read(hub, file).includes('\n\t"hooks"') && read(up, file).includes('\n  "hooks"'));
     assert.equal(upConfig.permissions, undefined);
     assert.deepEqual(hubConfig.permissions, { allow: ["Edit(artifacts/feature-team/**)"] });
     assert.equal(sync(), "");

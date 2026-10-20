@@ -1,253 +1,250 @@
 {
-  "permissions": {
-    "allow": [
-      "Edit(artifacts/feature-team/**)",
-      "Edit(artifacts/work/**)"
-    ],
-    "ask": [
-      "Edit(/.agents/**)",
-      "Edit(/.claude/agents/**)",
-      "Edit(/.claude/hooks/**)",
-      "Edit(/.claude/skills/**)",
-      "Edit(/.claude/settings.json)",
-      "Edit(/.claude/settings.local.json)",
-      "Edit(/.codex/**)",
-      "Edit(/AGENTS.md)",
-      "Edit(/CLAUDE.md)",
-      "Edit(/docs/agent-rules/**)",
-      "Edit(/.harness/**)"
-    ]
-  },
-  "language": "korean",
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  },
-  "worktree": {
-    "baseRef": "head"
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.harness/sync.sh\" session"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-why-explanation.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-status-verification.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-single-best-practice.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/confirm-edit-on-report-request.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/remind-skill-name-in-prompt.sh\""
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-attribution-trailers.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/enforce-commit-msg-style.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-safety-guard.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "EnterWorktree",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/orchestrator-no-worktree.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/confirm-edit-on-report-request.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-branch-guard.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-em-dash-in-source.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-comment-line-wrap.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-coderabbit-run.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-isolation-when-dirty.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-fork-spawn.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-agent-tool-declaration.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-reask-after-free-text-answer.sh\""
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__plugin_figma_figma__get_design_context",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude figma-context"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__plugin_figma_figma__get_screenshot",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude figma-screenshot"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__playwright__browser_take_screenshot|mcp__chrome-devtools__take_screenshot",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude browser-screenshot"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__playwright__browser_evaluate|mcp__chrome-devtools__evaluate_script",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude browser-measure"
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude browser-measure-chrome"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude source-edit"
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-tailwind-source-exclusion.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-agent-harness-sync.sh\""
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-korean-response.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" stop claude"
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-review-findings-relayed.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-prd-claim-citation.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
-          },
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/judge-unverified-claims.sh\"",
-            "timeout": 90
-          }
-        ]
-      }
-    ]
-  }
+	"permissions": {
+		"allow": ["Edit(artifacts/feature-team/**)", "Edit(artifacts/work/**)"],
+		"ask": [
+			"Edit(/.agents/**)",
+			"Edit(/.claude/agents/**)",
+			"Edit(/.claude/hooks/**)",
+			"Edit(/.claude/skills/**)",
+			"Edit(/.claude/settings.json)",
+			"Edit(/.claude/settings.local.json)",
+			"Edit(/.codex/**)",
+			"Edit(/AGENTS.md)",
+			"Edit(/CLAUDE.md)",
+			"Edit(/docs/agent-rules/**)",
+			"Edit(/.harness/**)"
+		]
+	},
+	"language": "korean",
+	"env": {
+		"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+	},
+	"worktree": {
+		"baseRef": "head"
+	},
+	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "startup",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.harness/sync.sh\" session"
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-why-explanation.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-status-verification.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-single-best-practice.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/confirm-edit-on-report-request.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/remind-skill-name-in-prompt.sh\""
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-attribution-trailers.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/enforce-commit-msg-style.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-safety-guard.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "EnterWorktree",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/orchestrator-no-worktree.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write|NotebookEdit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/confirm-edit-on-report-request.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-branch-guard.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-em-dash-in-source.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-comment-line-wrap.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-coderabbit-run.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "Agent",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-isolation-when-dirty.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-fork-spawn.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-agent-tool-declaration.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "AskUserQuestion",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-reask-after-free-text-answer.sh\""
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "mcp__plugin_figma_figma__get_design_context",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude figma-context"
+					}
+				]
+			},
+			{
+				"matcher": "mcp__plugin_figma_figma__get_screenshot",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude figma-screenshot"
+					}
+				]
+			},
+			{
+				"matcher": "mcp__playwright__browser_take_screenshot|mcp__chrome-devtools__take_screenshot",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude browser-screenshot"
+					}
+				]
+			},
+			{
+				"matcher": "mcp__playwright__browser_evaluate|mcp__chrome-devtools__evaluate_script",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude browser-measure"
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude browser-measure-chrome"
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" record claude source-edit"
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-tailwind-source-exclusion.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-agent-harness-sync.sh\""
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-korean-response.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-figma-visual-verification.sh\" stop claude"
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-review-findings-relayed.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-prd-claim-citation.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/judge-unverified-claims.sh\"",
+						"timeout": 90
+					}
+				]
+			}
+		]
+	}
 }
