@@ -81,7 +81,7 @@ waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.
 | 구분 | 내용 |
 | --- | --- |
 | 대상 | waveness `harness/.claude/hooks/`·`harness/.codex/hooks/` ↔ seungness `harness/` 같은 경로 |
-| 제외 | waveness 루트 `.harness/upstream-paths`의 `!` 줄. 프런트엔드·feature-team 전용 훅과 그 훅을 가리키는 등록은 seungness로 올리지 않음 |
+| 제외 | waveness 루트 `.harness/upstream-paths`의 `!` 줄. 프런트엔드·feature-team 전용 훅, waveness에서 쓰지 않는 seungness 전용 훅과 그 훅을 가리키는 등록은 양방향 모두 주고받지 않음 |
 | 등록 | `hooks` 키만 등록 항목(이벤트·matcher·명령) 단위로 병합. 한쪽의 추가·삭제가 다른 쪽에 반영되고, `permissions`·`env` 등 나머지 설정은 각 저장소가 따로 가짐 |
 | 상태 | waveness 루트 `.harness/upstream.json`의 `synced`(마지막으로 맞춘 seungness 커밋) |
 

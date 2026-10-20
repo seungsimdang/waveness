@@ -1,4 +1,4 @@
-# seungness와 양방향 동기화하는 harness/ 기준 경로. `/`로 끝나면 하위 전체, `!`로 시작하면 waveness 전용(seungness로 올리지 않음)
+# seungness와 양방향 동기화하는 harness/ 기준 경로. `/`로 끝나면 하위 전체, `!`로 시작하면 양방향 제외(seungness로 올리지도, seungness에서 받지도 않음)
 .claude/hooks/
 .codex/hooks/
 !.claude/hooks/check-agent-harness-sync.sh
