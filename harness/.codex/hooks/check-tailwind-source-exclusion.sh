@@ -9,7 +9,7 @@ file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty' 2>/dev
 
 case "$file_path" in
   artifacts/feature-team/00-figma-context.md|*/artifacts/feature-team/00-figma-context.md)
-    css_file="$(git rev-parse --show-toplevel 2>/dev/null)/src/app/globals.css"
+    css_file="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}/src/app/globals.css"
     if [ -f "$css_file" ] && grep -q '@source not.*artifacts' "$css_file" 2>/dev/null; then
       exit 0
     fi
