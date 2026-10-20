@@ -10,6 +10,18 @@ Codex는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시�
 
 이 하네스는 회사 공용 하네스 저장소(waveness)에서 받아온 것이다. 공용 하네스와 주고받는 규칙, `Harness-Scope` 커밋 줄, 프로젝트 소유 파일은 `sync.md`를 따른다. 훅 스크립트와 훅 등록은 waveness가 seungness와도 주고받는다(`sync.md`의 "seungness 훅 동기화").
 
+### 연결 후 동기화
+
+| 시점 | 받기(공용 → 프로젝트) | 올리기(프로젝트 → 공용) |
+| --- | --- | --- |
+| Claude·Codex 세션 시작 | 실행 | 실행 |
+| 커밋·병합 직후 | 실행 안 함 | `generic` 커밋이 있으면 백그라운드 실행 |
+
+- 받기: 공용 하네스에서 바뀐 파일을 3-way 병합하고 `Harness-Scope: sync`로 자동 커밋한다.
+- 올리기: 통합 브랜치의 `Harness-Scope: generic` 커밋만 waveness main에 반영하고 push한다. 사람 검토는 거치지 않는다.
+- 건너뛰는 경우: 받기는 worktree 세션이거나 스테이징된 변경·하네스 파일의 미커밋 변경이 있을 때, 올리기는 waveness가 main이 아니거나 미커밋 변경이 있을 때. 다음 세션 시작 때 다시 시도한다.
+- 충돌·실패 대응과 수동 실행은 `sync.md`를 따른다.
+
 ## 스킬
 
 양쪽 도구에서 feature-team-orchestrator, itd-commit, finding-validity-gate, coderabbit-triage, cross-agent-handoff, harness-lab을 관리한다.
