@@ -34,13 +34,24 @@ ln -s "$PWD/skills/waveness-connect" ~/.agents/skills/waveness-connect
 
 그다음 연결할 프로젝트의 Claude·Codex 세션에서 "waveness에 연결해"라고 하면 `waveness-connect` 스킬이 아래 절차를 실행한다.
 
-waveness와 프로젝트를 같은 폴더에 둔다. 다른 위치면 `HARNESS_HUB` 환경 변수로 지정한다. 자동 올리기는 waveness가 main 브랜치이고 미커밋 변경이 없을 때만 동작한다.
+waveness와 프로젝트를 같은 폴더에 둔다. 다른 위치면 `HARNESS_HUB` 환경 변수로 지정한다.
 
 1. 프로젝트에서 `node ../waveness/bin/harness.mjs pull .` 로 처음 받는다. 기존 하네스 파일과 다르면 충돌 표시가 남으므로 정리한다.
 2. `docs/agent-rules/project.md`에 스택·기획 문서·디렉터리·검증 명령을 채우고, 프로젝트 전용 규칙 파일은 `.harness/paths` 끝에 `!` 줄로 제외한다.
 3. 통합 브랜치가 develop·main·master가 아니면 `.harness/lock.json`에 `"branch"`를 적는다.
 4. 프로젝트 Git 훅에 commit-msg(`sh .harness/check-scope.sh "$1"`), post-commit·post-merge(`sh .harness/sync.sh commit`)를 등록한다.
-5. `Harness-Scope: sync`로 커밋한다. 이후 세션 시작과 커밋 직후에 자동으로 동기화된다.
+5. `Harness-Scope: sync`로 커밋한다. 이후 동기화는 아래 "연결 후 동기화"대로 자동 실행된다.
+
+## 연결 후 동기화
+
+| 시점 | 받기(공용 → 프로젝트) | 올리기(프로젝트 → 공용) |
+| --- | --- | --- |
+| Claude·Codex 세션 시작 | 실행 | 실행 |
+| 커밋·병합 직후 | 실행 안 함 | `generic` 커밋이 있으면 백그라운드 실행 |
+
+- 받기: 공용 하네스에서 바뀐 파일을 3-way 병합하고 `Harness-Scope: sync`로 자동 커밋한다.
+- 올리기: 통합 브랜치의 `Harness-Scope: generic` 커밋만 waveness main에 반영하고 push한다. 사람 검토는 거치지 않는다.
+- 건너뛰는 경우: 받기는 worktree 세션이거나 스테이징된 변경·하네스 파일의 미커밋 변경이 있을 때, 올리기는 waveness가 main이 아니거나 미커밋 변경이 있을 때. 다음 세션 시작 때 다시 시도한다.
 
 ## 수동 실행
 
