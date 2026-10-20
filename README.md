@@ -1,6 +1,6 @@
 # waveness
 
-Claude·Codex 공용 에이전트 하네스와 프로젝트 동기화 도구. 회사 프런트엔드 프로젝트(samsungshi-scaffolding-frontend, trinione_monitoring_frontend, hkmold-monitoring-frontend)의 하네스를 합쳐 만들었고, 다른 저장소 없이 단독으로 운용한다.
+Claude·Codex 공용 에이전트 하네스와 프로젝트 동기화 도구. 다른 저장소 없이 단독으로 운용한다.
 
 | 경로 | 내용 |
 | --- | --- |
@@ -49,12 +49,3 @@ node bin/harness.mjs pull <프로젝트>   # 받기. 충돌 표시를 남기고 
 node bin/harness.mjs push <프로젝트>   # 올리기. 프로젝트의 generic 커밋을 waveness 현재 브랜치에 커밋, push는 직접
 node bin/harness.mjs auto <프로젝트> [pull|push|both]   # 훅과 같은 자동 동작
 ```
-
-## seungness 훅 동기화(선택)
-
-waveness 옆 폴더에 개인 범용 하네스 `seungness`가 있을 때만 동작한다. 없으면 아무 메시지 없이 건너뛰므로 waveness만 받은 PC에는 영향이 없다. 다른 위치면 `UPSTREAM_HUB`로 지정한다.
-
-- 대상: `harness/.claude/hooks/`, `harness/.codex/hooks/`의 스크립트와 `harness/.claude/settings.json`, `harness/.codex/hooks.json`의 훅 등록. 등록은 `hooks` 키만 항목(이벤트·matcher·명령) 단위로 주고받고 나머지 설정은 각자 유지한다. `.harness/upstream-paths`의 `!` 줄(프런트엔드 전용 훅)과 그 훅을 가리키는 등록은 seungness로 올리지 않는다.
-- 시점: 이 저장소의 세션 시작, 이 저장소 커밋 직후(post-commit, 백그라운드), 연결된 프로젝트의 자동 동기화 직전.
-- 방식: `.harness/upstream.json`의 `synced`(마지막으로 맞춘 seungness 커밋)를 기준으로 파일마다 3-way 병합하고, 바뀐 쪽에 커밋·push한다. seungness 커밋에는 `Harness-Origin: waveness@{커밋}`과 CHANGELOG 항목이 붙는다. 같은 줄 충돌이 있으면 양쪽 모두 쓰지 않고 중단한다.
-- 건너뜀: 두 저장소 중 하나가 main이 아니거나 미커밋 변경이 있을 때. 다음 시점에 다시 시도한다.

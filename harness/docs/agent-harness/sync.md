@@ -76,7 +76,7 @@ node ../waveness/bin/harness.mjs push .   # 올리기. waveness 현재 브랜치
 
 ## seungness 훅 동기화
 
-waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.claude/settings.json`, `.codex/hooks.json`의 `hooks`)은 개인 범용 하네스 seungness의 같은 경로와 양방향으로 주고받는다. 프로젝트는 이 동기화에 직접 참여하지 않고, waveness를 거쳐 받는다.
+waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.claude/settings.json`, `.codex/hooks.json`의 `hooks`)은 개인 범용 하네스 seungness의 같은 경로와 양방향으로 주고받는다. 프로젝트는 이 동기화에 직접 참여하지 않고, waveness를 거쳐 받는다. waveness 옆 폴더에 seungness가 있을 때만 동작하고, 없으면 아무 메시지 없이 건너뛰므로 waveness만 받은 PC에는 영향이 없다. 다른 위치면 `UPSTREAM_HUB` 환경 변수로 지정한다.
 
 | 구분 | 내용 |
 | --- | --- |
