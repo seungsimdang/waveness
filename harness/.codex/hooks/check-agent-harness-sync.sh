@@ -28,7 +28,8 @@ case "$file_path" in
     ;;
 esac
 
-project_dir=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+project_dir="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+[ -n "$project_dir" ] || exit 0
 pair_file="$project_dir/$pair_rel"
 
 if [ ! -f "$pair_file" ]; then

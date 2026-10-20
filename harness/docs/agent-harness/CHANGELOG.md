@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-10-20 허브 저장소에도 하네스 적용
+
+- 대상: waveness 루트 `.claude/settings.json`·`.codex/hooks.json`·`AGENTS.md`·`CLAUDE.md`, `bin/hub-hooks.mjs`, `.codex/hooks/check-agent-harness-sync.sh`
+- 내용: 허브 루트 훅 등록을 `harness/` 등록에서 생성하고 `CLAUDE_PROJECT_DIR`을 `harness/`로 넘겨 프로젝트와 같은 경로로 동작하게 했다. main에서 작업하는 허브 특성상 `check-branch-guard`와 동작하지 않는 `.harness/sync.sh`만 뺐다. Codex판 하네스 짝 점검 훅이 `CLAUDE_PROJECT_DIR`을 우선하도록 Claude판·`block-comment-line-wrap.sh`와 맞췄다.
+
 ## 2026-10-20 Feature Team 4역할 재구성과 세 프로젝트 범용 규칙 반영
 
 - 대상: `AGENTS.md`, `CLAUDE.md`, `.claude/agents/*`·`.codex/agents/*`(prior-art-researcher 추가), `feature-team-orchestrator`(Claude·Codex), `artifacts/feature-team/README.md`, `check-review-findings-relayed.sh`, `docs/agent-rules/branch-strategy.md`

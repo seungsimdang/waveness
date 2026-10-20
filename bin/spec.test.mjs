@@ -49,3 +49,11 @@ test("훅 등록이 가리키는 파일이 모두 있음", () => {
   assert.ok(commands.length > 0);
   for (const path of commands) assert.ok(existsSync(join(H, path)), path);
 });
+
+test("루트 훅 등록은 harness/ 등록을 허브용으로 바꾼 결과와 같음", async () => {
+  const { HUB_CONFIGS, hubConfig } = await import("./hub-hooks.mjs");
+  for (const file of HUB_CONFIGS) {
+    const root = JSON.parse(readFileSync(join(H, "..", file), "utf8"));
+    assert.deepEqual(root, hubConfig(file), `${file}: node bin/hub-hooks.mjs로 다시 생성`);
+  }
+});

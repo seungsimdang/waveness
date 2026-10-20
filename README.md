@@ -11,7 +11,8 @@ Claude·Codex 공용 에이전트 하네스와 프로젝트 동기화 도구. �
 | `templates/project.md` | 처음 받을 때 프로젝트에 만드는 프로젝트 규칙 파일 |
 | `.githooks/` | pre-commit(테스트), post-commit(seungness 훅 동기화) |
 | `.harness/upstream-paths`, `.harness/upstream.json` | seungness 훅 동기화 대상·제외 목록과 마지막 동기화 기준 |
-| `.claude/settings.json`, `.codex/hooks.json` | 이 저장소 세션 시작 때 seungness 훅 동기화, 보고 전용 훅 등록 |
+| `.claude/settings.json`, `.codex/hooks.json` | 이 저장소 세션 시작 때 seungness 훅 동기화와 하네스 훅 등록. `node bin/hub-hooks.mjs`로 `harness/`에서 생성 |
+| `AGENTS.md`, `CLAUDE.md` | 이 저장소 작업에도 하네스 규칙을 적용하는 허브 예외 규칙 |
 
 파일 소유, `Harness-Scope` 판단 기준, 자동 동기화 조건, 문제 대응은 `harness/docs/agent-harness/sync.md`에 있다.
 
