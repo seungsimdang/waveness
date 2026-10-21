@@ -1,5 +1,13 @@
 # 하네스 변경 이력
 
+## 2026-10-21 feat/ITD-7525 공용 PR 생성 스킬 추가
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@fd6d12063261a82e7237f57d2aaba45f984f7a62`
+
+> - 대표 커밋과 전체 브랜치 변경을 대조하는 PR 작성 절차 추가
+> - 본인 Assignee와 기존 라벨 설정 및 중복 생성 방지 절차 추가
+> - Claude·Codex의 PR 스킬 호출 안내 추가
+
 ## 2026-10-20 feat/ITD-7509 공용 구현·검증 지침 정리
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@be7c5eb27300c8ac4fcf51681bcc4843777419d3`

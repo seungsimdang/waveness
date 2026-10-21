@@ -117,6 +117,7 @@
 | --- | --- |
 | `feature-team-orchestrator` | 신규 기능/화면 개발, 재실행·부분 수정 |
 | `itd-commit` | 커밋 생성·amend |
+| `pr-create` | 대표 커밋 기반 PR 작성·생성·갱신, 본인 Assignee·기존 라벨 설정 |
 | `finding-validity-gate` | 코드리뷰 finding 일괄 반영 |
 | `coderabbit-triage` | CodeRabbit 리뷰 실행과 지적 선별 반영 |
 | `cross-agent-handoff` | Claude·Codex 또는 세션 사이 작업 인계 |
