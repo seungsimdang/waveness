@@ -51,7 +51,7 @@ description: 하네스 엔지니어링 설계·생성 스킬. 사용자가 결�
 - 기존 `.claude/agents`, `.claude/skills`, `CLAUDE.md`가 있으면 먼저 읽고, 덮어쓰기 전에 변경 범위를 분명히 한다.
 - 실행 하네스 생성 시에는 현재 프로젝트의 `.claude/agents`, `.claude/skills`, `CLAUDE.md` 포인터를 기준으로 구성한다.
 - 실행 하네스를 만들 때 `CLAUDE.md`에는 자연어 라우팅 규칙을 남긴다. 사용자가 스킬명을 직접 입력하지 않아도 해당 하네스의 업무로 판단되면 `{하네스-이름}-orchestrator`를 먼저 사용하도록 안내한다.
-- 실행 하네스의 기본 후보는 Agent Team이다. Agent가 2개 이상이고 중간 발견 공유, 상충 의견 조율, 단계별 검증이 필요하면 Orchestrator가 `TeamCreate`, `TaskCreate`, `TaskUpdate`, `TaskGet`, `SendMessage`, `TeamDelete` 흐름을 포함하도록 설계한다.
+- 실행 하네스의 기본 후보는 Agent Team이다. Agent가 2개 이상이고 중간 발견 공유, 상충 의견 조율, 단계별 검증이 필요하면 Orchestrator가 `Agent` 스폰, `TaskCreate`, `TaskUpdate`, `TaskGet`, `SendMessage`, `TaskStop` 흐름을 포함하도록 설계한다.
 - Agent Team-first는 무조건 팀을 만든다는 뜻이 아니다. 단일 흐름, Subagent, Agent Team 중 조율 비용과 문맥 경계를 보고 고르되, 팀이 필요한 작업에서는 Agent 파일 생성에 그치지 않고 팀 런타임 계약까지 포함한다.
 - 단일 역할로 충분하거나 팀원 간 직접 통신이 필요 없는 일만 단일 Agent 또는 체크리스트 흐름으로 둔다. 이 경우에도 산출물은 반드시 `artifacts/`에 남긴다.
 - Orchestrator 역할을 하는 Skill은 폴더명과 frontmatter `name`이 반드시 `-orchestrator`로 끝나야 한다. 예: `.claude/skills/trip-planning-orchestrator/SKILL.md`.
@@ -178,14 +178,14 @@ Agent Team을 쓰기 좋은 경우:
 
 Orchestrator Skill에는 아래 실행 흐름을 포함한다.
 
-1. `TeamCreate`로 필요한 Agent를 팀원으로 구성한다.
+1. `Agent` 도구(`subagent_type`에 Agent 파일명, `name`에 고정 팀원 이름)로 필요한 팀원을 스폰한다.
 2. `TaskCreate`로 단계별 작업과 의존 관계를 등록한다.
 3. 팀원과 Orchestrator는 필요할 때 `TaskUpdate`로 진행 상태, 차단, 완료를 갱신한다.
 4. Orchestrator는 `TaskGet`으로 지연, 누락, 의존 관계 막힘을 확인한다.
 5. 팀원들은 `SendMessage`로 발견, 질문, 충돌 지점을 공유한다.
 6. 각 팀원은 자기 결과를 `artifacts/{phase}-{role}-{artifact}.md` 같은 파일로 저장한다.
 7. Orchestrator는 `artifacts/` 산출물을 읽어 통합하고, 사람 승인 지점을 확인한다.
-8. 실행이 끝나면 `TeamDelete`로 팀을 정리한다.
+8. 실행이 끝나면 스폰한 팀원을 모두 `TaskStop`으로 종료한다.
 
 팀 재구성이 필요하면 이전 팀의 결과를 먼저 `artifacts/`에 저장한 뒤 팀을 정리하고 새 팀을 만든다. 대화 메시지는 조율에 쓰고, 다음 단계가 반드시 읽어야 하는 내용은 파일 산출물로 남긴다.
 

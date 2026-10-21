@@ -85,13 +85,13 @@ artifacts/evals/iteration-1/{eval-name}/baseline/
 
 | 검증 항목 | 확인 방법 |
 | --- | --- |
-| 팀 구성 | Orchestrator에 `TeamCreate` 대상 Agent가 명시되어 있는지 확인 |
+| 팀 구성 | Orchestrator에 스폰할 팀원 Agent가 명시되어 있는지 확인 |
 | 작업 등록 | Task마다 담당자, 입력, 출력, 의존, 완료 기준이 있는지 확인 |
 | 작업 상태 | `TaskUpdate`로 시작, 차단, 완료, 재할당을 표시하는 기준이 있는지 확인 |
 | 진행 확인 | `TaskGet`으로 Phase 전환 전 누락과 지연을 확인하는지 확인 |
 | 메시지 규칙 | `SendMessage`가 필요한 발견, 질문, 충돌, 차단, 완료 조건이 있는지 확인 |
 | 파일 산출물 | 각 Agent가 자기 결과를 `artifacts/`에 남기도록 되어 있는지 확인 |
-| 팀 정리 | 실행 종료 또는 팀 재구성 시 `TeamDelete` 조건이 있는지 확인 |
+| 팀 정리 | 실행 종료 또는 팀 재구성 시 `TaskStop` 종료 조건이 있는지 확인 |
 | 팀 재구성 | 중첩 팀 대신 `handoff.md`와 새 팀 생성 절차가 있는지 확인 |
 | 후속 실행 | 재실행, 부분 수정, 업데이트, 이전 결과 기반 개선 분기가 있는지 확인 |
 
@@ -164,7 +164,7 @@ QA는 전체가 끝난 뒤 한 번만 실행하지 않는다. 중간 산출물�
 - [ ] Orchestrator가 중간 산출물을 이어준다.
 - [ ] `artifacts/README.md`에 산출물 지도와 다음 단계가 읽을 파일이 적혀 있다.
 - [ ] 단계별 중간 산출물과 최종 산출물이 대화가 아니라 파일로 남는다.
-- [ ] Agent Team 하네스라면 `TeamCreate`, `TaskCreate`, `TaskUpdate`, `TaskGet`, `SendMessage`, `TeamDelete` 흐름이 있다.
+- [ ] Agent Team 하네스라면 `Agent` 스폰, `TaskCreate`, `TaskUpdate`, `TaskGet`, `SendMessage`, `TaskStop` 흐름이 있다.
 - [ ] QA Agent가 있다면 존재 확인보다 경계면 교차 검증을 수행한다.
 - [ ] QA Agent가 있다면 전체 완료 후 1회가 아니라 중요한 중간 산출물 직후 점진적으로 실행된다.
 - [ ] `CLAUDE.md`에 자연어 요청을 Orchestrator Skill로 연결하는 규칙이 있다.
@@ -208,7 +208,7 @@ Skill과 Orchestrator의 description은 실제 사용자가 말할 법한 문장
 | `CLAUDE.md` 포인터 | 하네스 이름과 Orchestrator가 맞다 | 예전 Skill 이름을 가리킨다 |
 | Agent 목록 | Orchestrator가 부르는 Agent가 실제 존재한다 | 삭제된 Agent를 아직 호출한다 |
 | Skill 목록 | 작업 Skill과 Orchestrator 책임이 구분된다 | Orchestrator가 일반 작업까지 모두 직접 한다 |
-| Agent Team 계약 | TeamCreate, TaskCreate, TaskUpdate, TaskGet, SendMessage, TeamDelete 흐름이 있다 | Agent 파일만 있고 팀 실행 절차가 없다 |
+| Agent Team 계약 | Agent 스폰, TaskCreate, TaskUpdate, TaskGet, SendMessage, TaskStop 흐름이 있다 | Agent 파일만 있고 팀 실행 절차가 없다 |
 | 산출물 경로 | 단계별 파일명이 정해져 있다 | 중간 결과가 대화에만 남는다 |
 | 검증 | 테스트와 체크리스트가 있다 | "검토한다"만 있고 기준이 없다 |
 | 승인 | 위험 행동 전에 멈춘다 | 외부 발송, 제출, 삭제를 자동으로 끝낸다 |

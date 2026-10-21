@@ -194,7 +194,7 @@ Orchestrator Skill은 일반 Skill보다 더 명확해야 한다. 전체 실행�
 - 하네스 목표
 - 읽어야 할 입력과 기존 산출물
 - Agent Team 사용 여부
-- `TeamCreate`, `TaskCreate`, `SendMessage`, `TeamDelete` 흐름
+- `Agent` 스폰, `TaskCreate`, `SendMessage`, `TaskStop` 흐름
 - 단계별 산출물 경로
 - 사람 승인 지점
 - 실패 시 멈춤 조건

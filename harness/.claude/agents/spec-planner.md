@@ -3,7 +3,7 @@ name: spec-planner
 description: 사용자가 요청한 신규 기능/화면을 PRD·API 명세·선례 조사 결과와 종합해 프로젝트 데이터 계층 구조에 맞는 구현 계획과 사람 확인이 필요한 항목으로 정리할 때 사용한다. API 명세에 있는 항목은 실제 연동으로, 명세에 없거나 미확정인 항목만 목데이터로 계획한다. Figma 노드 링크가 제공되면 Orchestrator가 저장한 `00-figma-context.md`를 작업 전 반드시 읽는다.
 tools: Read, Write, Glob, Grep, SendMessage
 skills:
-  - figma-design-to-code
+  - figma:figma-design-to-code
 model: sonnet
 effort: medium
 ---

@@ -27,7 +27,7 @@
 - Agent를 몇 개 만들지 판단해야 할 때
 - 단일 흐름, Subagent, Agent Team 중 무엇이 맞는지 정해야 할 때
 - Agent 파일에 팀 통신 프로토콜을 작성해야 할 때
-- Orchestrator에 `TeamCreate`, `TaskCreate`, `TaskUpdate`, `TaskGet`, `SendMessage`, `TeamDelete` 흐름을 넣어야 할 때
+- Orchestrator에 `Agent` 스폰, `TaskCreate`, `TaskUpdate`, `TaskGet`, `SendMessage`, `TaskStop` 흐름을 넣어야 할 때
 - Skill description, workflow, output format, edge case를 설계해야 할 때
 
 ## Agent, Skill, Orchestrator의 차이
@@ -93,7 +93,7 @@ Orchestrator Skill에는 아래 항목이 모두 있어야 한다.
 
 1. `artifacts/`를 확인해 초기 실행, 부분 재실행, 새 실행 중 하나를 고른다.
 2. 사용자 요청, 입력 자료, 제약, 사람 승인 지점을 `artifacts/00-input.md`에 저장한다.
-3. `TeamCreate`로 필요한 Agent를 팀원으로 구성한다.
+3. `Agent` 도구(`subagent_type`에 Agent 파일명, `name`에 고정 팀원 이름)로 필요한 팀원을 스폰한다.
 4. `TaskCreate`로 단계별 작업을 등록한다.
 5. 각 Task에는 담당자, 입력 파일, 출력 파일, 의존 관계, 완료 기준을 둔다.
 6. 팀원은 시작, 차단, 완료 상태를 `TaskUpdate`로 갱신한다.
@@ -103,7 +103,7 @@ Orchestrator Skill에는 아래 항목이 모두 있어야 한다.
 10. Orchestrator는 산출물을 읽고 누락, 충돌, 승인 필요 지점을 정리한다.
 11. 최종 결과를 `artifacts/final.md` 또는 도메인별 최종 파일에 저장한다.
 12. `artifacts/improvement-log.md`와 필요하면 `artifacts/handoff.md`를 갱신한다.
-13. 실행이 끝나면 `TeamDelete`로 팀을 정리한다.
+13. 실행이 끝나면 스폰한 팀원을 모두 `TaskStop`으로 종료한다.
 
 ## Task 설계 형식
 
@@ -256,9 +256,9 @@ skills:
 
 | 전환 | 규칙 |
 | --- | --- |
-| 팀에서 Subagent로 | 현재 팀 산출물을 `artifacts/`에 저장하고 `TeamDelete` 후 Subagent를 호출한다 |
+| 팀에서 Subagent로 | 현재 팀 산출물을 `artifacts/`에 저장하고 팀원을 `TaskStop`으로 종료한 뒤 Subagent를 호출한다 |
 | Subagent에서 팀으로 | Subagent 결과 파일을 `artifacts/`에 저장하고 새 팀의 입력으로 전달한다 |
-| 팀에서 새 팀으로 | 기존 팀의 `handoff.md`를 만든 뒤 `TeamDelete`, 새 `TeamCreate` 순서로 진행한다 |
+| 팀에서 새 팀으로 | 기존 팀의 `handoff.md`를 만든 뒤 기존 팀원 `TaskStop`, 새 팀원 스폰 순서로 진행한다 |
 
 하이브리드 Orchestrator에는 각 Phase 상단에 `실행 모드: Agent Team | Subagent | 단일 흐름`을 적는다.
 
@@ -303,7 +303,7 @@ description에는 세 가지가 들어간다.
 
 피해야 할 설계:
 
-- Agent 파일만 여러 개 만들고 `TeamCreate` 흐름이 없는 구조
+- Agent 파일만 여러 개 만들고 팀원 스폰 흐름이 없는 구조
 - 메시지로만 중요한 결정을 주고받고 파일 산출물을 남기지 않는 구조
 - 모든 Agent가 모든 파일을 동시에 고치는 구조
 - Orchestrator가 모든 일을 직접 하고 Agent Team을 장식처럼 두는 구조

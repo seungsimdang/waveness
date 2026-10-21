@@ -114,14 +114,14 @@ Agent Team을 선택한 경우에만 작성한다.
 
 | 항목 | 이번 하네스의 계약 |
 | --- | --- |
-| `TeamCreate` 팀원 |  |
+| `Agent` 스폰 팀원 |  |
 | `TaskCreate` 작업 목록 |  |
 | `TaskUpdate` 상태 갱신 | 시작, 차단, 완료, 재할당 |
 | `TaskGet` 확인 시점 | Phase 전환 전, 지연 감지, 최종 통합 전 |
 | `SendMessage`가 필요한 상황 | 발견 공유, 질문, 충돌, 차단, 완료 |
 | 파일 산출물 규칙 |  |
 | 팀 재구성 조건 |  |
-| `TeamDelete` 시점 |  |
+| `TaskStop` 시점 |  |
 
 ### 테스트 프롬프트
 
@@ -333,7 +333,7 @@ description: 여러 Agent와 Skill을 순서대로 묶어 하나의 하네스 �
 ## Agent Team 실행 흐름
 
 1. 요청을 정리하고 `artifacts/00-input.md`에 입력, 제약, 승인 지점을 저장한다.
-2. `TeamCreate`로 필요한 Agent를 팀원으로 구성한다.
+2. `Agent` 도구(`subagent_type`에 Agent 파일명, `name`에 고정 팀원 이름)로 필요한 팀원을 스폰한다.
 3. `TaskCreate`로 단계별 작업과 의존 관계를 등록한다.
 4. 팀원들은 `TaskUpdate`로 시작, 차단, 완료 상태를 갱신한다.
 5. Orchestrator는 Phase 전환 전 `TaskGet`으로 누락과 지연을 확인한다.
@@ -342,13 +342,13 @@ description: 여러 Agent와 Skill을 순서대로 묶어 하나의 하네스 �
 8. Orchestrator는 산출물을 읽고 누락, 충돌, 승인 필요 사항을 확인한다.
 9. 최종 결과를 `artifacts/final.md`에 저장한다.
 10. `artifacts/improvement-log.md`와 필요한 경우 `artifacts/handoff.md`를 갱신한다.
-11. 실행이 끝나면 `TeamDelete`로 팀을 정리한다.
+11. 실행이 끝나면 스폰한 팀원을 모두 `TaskStop`으로 종료한다.
 
 ## 하이브리드 전환
 
-- 팀에서 Subagent로 넘어갈 때는 먼저 팀 산출물을 저장하고 `TeamDelete`를 수행한다.
+- 팀에서 Subagent로 넘어갈 때는 먼저 팀 산출물을 저장하고 팀원을 `TaskStop`으로 종료한다.
 - Subagent 결과를 팀이 이어받아야 하면 반환값만 넘기지 말고 `artifacts/` 파일로 저장한다.
-- 새 팀이 필요하면 `artifacts/handoff.md`를 만든 뒤 기존 팀을 정리하고 새 `TeamCreate`를 수행한다.
+- 새 팀이 필요하면 `artifacts/handoff.md`를 만든 뒤 기존 팀원을 `TaskStop`으로 종료하고 새 팀원을 스폰한다.
 
 ## 실패 처리
 

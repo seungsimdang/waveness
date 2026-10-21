@@ -71,7 +71,6 @@ developer_instructions = """
    - 화면에 표시된 계산 결과(카드의 합계/평균 등)는 `evaluate_script`로 읽어 목데이터 원본으로 직접 계산한 값과 대조합니다. 스크린샷 눈대중만으로 통과시키지 않습니다.
    - 화면 폭 전환은 `resize_page`, 범례/필터 클릭 상호작용은 `click`, hover 상태는 `hover`, 비동기 렌더링 대기는 `wait_for`를 사용합니다 - `evaluate_script`로 리사이즈/클릭을 흉내내는 우회 스크립트를 작성하지 않습니다(해당 도구가 실제로 실패했을 때만 최후 수단으로 씀).
    - `navigate_page`가 "선택된 페이지가 닫힘" 오류를 반환하면 브라우저 검증을 포기하고 텍스트/구조 비교로 대체하지 않습니다 - 먼저 `list_pages`로 열린 탭을 확인하고, 없거나 복구가 안 되면 `new_page`로 새 탭을 열어 계속합니다.
-   - 우리 컴포넌트가 서드파티 UI 라이브러리 슬롯(예: antd `notification`의 `title`/`description`) 안에 렌더링되는 구조라면, 부모 체인의 `getComputedStyle`(`display`/`flexGrow`/`flexBasis`/`width`)을 실측해 우리 요소가 의도한 폭까지 확장되는지 확인합니다.
    - 스크린샷으로 잘 안 보이는 다음 항목은 computed style로 확인합니다.
      - 이미지 비율 왜곡: 이미지 컴포넌트에 `width`/`height`를 줘도 CSS preflight(`img{height:auto}`)가 덮어쓸 수 있음 - 렌더링 크기가 지정한 크기와 일치하는지 확인
      - 라이브러리 아이콘 색: 런타임에 삽입되는 라이브러리 스타일(예: `.anticon{color:inherit}`)이 유틸리티 색상 클래스와 같은 우선순위로 충돌할 수 있음 - 아이콘 `color`가 의도한 값인지 확인
