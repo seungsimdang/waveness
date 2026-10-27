@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-10-27 Codex 역할 모델·effort를 Claude 기준으로 정렬
+
+- 대상: `.codex/agents/spec-planner.toml`, `implementer.toml`, `integration-reviewer.toml`
+- 내용: Claude의 Sonnet 역할에 대응하는 Codex 모델을 `gpt-6.1-terra`로, effort를 Claude와 같은 `medium`으로 변경. Haiku 역할인 `prior-art-researcher`는 기존 `gpt-6-luna`·`medium` 유지.
+
 ## 2026-10-21 feat/ITD-7525 공용 PR 생성 스킬 추가
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@fd6d12063261a82e7237f57d2aaba45f984f7a62`
