@@ -52,6 +52,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/git-safety-guard.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/block-lint-warnings-on-commit.sh\""
           }
         ]
       },

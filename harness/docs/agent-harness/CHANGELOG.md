@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-10-28 에이전트 커밋의 lint 경고 차단 훅 추가
+
+- Claude·Codex PreToolUse(Bash)에 `block-lint-warnings-on-commit.sh` 등록. 프로젝트 lint 스크립트 설정과 무관하게 linter 설정 파일로 명령을 정하고 경고도 실패로 처리하는 옵션을 붙여 실행.
+- 지원 범위는 저장소 루트의 Biome·ESLint flat config. 그 밖의 linter와 실행 파일이 없는 경우는 통과. 사람이 직접 하는 커밋은 막지 못해 프로젝트 pre-commit 훅과 함께 사용.
+
 ## 2026-10-28 공용 lint 회귀 검사 배포
 
 - 포트폴리오 lint 테스트에서 명세 필수 절·팀 통신, 런타임 훅·Codex 어댑터, 인덱스 기반 소스·문서 검사, Biome 한글 테스트 제목 검사와 검사기를 `.harness/`로 분리.

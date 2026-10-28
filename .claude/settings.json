@@ -82,6 +82,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/git-safety-guard.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/block-lint-warnings-on-commit.sh\""
           }
         ]
       },

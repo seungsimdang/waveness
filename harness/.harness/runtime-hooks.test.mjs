@@ -99,6 +99,31 @@ for (const tool of [".claude", ".codex"]) {
         },
       }).status, 0);
   });
+  test(`${tool} lint 경고 훅이 경고가 있는 변경 파일의 커밋만 차단한다`, () => {
+    const repo = mkdtempSync(join(marks, "lint-"));
+    const git = (...args) => spawnSync("git", args, { cwd: repo, env });
+    git("init", "-q");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init");
+    writeFileSync(join(repo, ".gitignore"), "node_modules/\n");
+    writeFileSync(join(repo, "biome.json"), "{}");
+    mkdirSync(join(repo, "node_modules/.bin"), { recursive: true });
+    // 경고 옵션이 붙고 파일에 WARN이 있으면 실패하는 가짜 biome
+    const biome = join(repo, "node_modules/.bin/biome");
+    writeFileSync(biome, '#!/bin/sh\necho "$@" | grep -q -- --error-on-warnings || exit 3\nfor f; do [ -f "$f" ] && grep -q WARN "$f" && exit 1; done\nexit 0\n');
+    chmodSync(biome, 0o755);
+    const lint = (command, cwd = repo) =>
+      run(tool, "block-lint-warnings-on-commit", { cwd, tool_input: { command } }, cwd).status;
+    writeFileSync(join(repo, "a.ts"), "ok\n");
+    assert.equal(lint('git commit -m "a"'), 0);
+    writeFileSync(join(repo, "b.ts"), "WARN\n");
+    assert.equal(lint('git add . && git commit -m "a"'), 2);
+    assert.equal(lint("git status"), 0);
+    assert.equal(lint('echo "git commit"'), 0);
+    assert.equal(lint(`cd ${repo} && git commit -m "a"`, marks), 2);
+    assert.equal(lint(`git -C ${repo} commit -m "a"`, marks), 2);
+    rmSync(join(repo, "biome.json"));
+    assert.equal(lint('git commit -m "a"'), 0);
+  });
   test(`${tool} 소스 대시 훅이 앱 위반을 차단하고 정상 소스를 허용한다`, () => {
     assert.equal(run(tool, "block-em-dash-in-source", {
         tool_name: "Write",

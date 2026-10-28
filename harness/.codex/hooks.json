@@ -1,166 +1,170 @@
 {
-	"hooks": {
-		"SessionStart": [
-			{
-				"matcher": "startup",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.harness/sync.sh\" session"
-					}
-				]
-			}
-		],
-		"UserPromptSubmit": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-why-explanation.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-status-verification.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-single-best-practice.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-feasibility-verdict.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/confirm-edit-on-report-request.sh\""
-					}
-				]
-			}
-		],
-		"PreToolUse": [
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-attribution-trailers.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/enforce-commit-msg-style.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/git-safety-guard.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Edit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-branch-guard"
-					},
-					{
-						"type": "command",
-						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" confirm-edit-on-report-request"
-					},
-					{
-						"type": "command",
-						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" block-em-dash-in-source"
-					},
-					{
-						"type": "command",
-						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" block-comment-line-wrap"
-					}
-				]
-			}
-		],
-		"PostToolUse": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-feasibility-verdict.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "mcp__figma__get_design_context",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex figma-context"
-					}
-				]
-			},
-			{
-				"matcher": "mcp__figma__get_screenshot",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex figma-screenshot"
-					}
-				]
-			},
-			{
-				"matcher": "mcp__playwright__browser_take_screenshot|mcp__chrome_devtools__take_screenshot",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex browser-screenshot"
-					}
-				]
-			},
-			{
-				"matcher": "mcp__playwright__browser_evaluate|mcp__chrome_devtools__evaluate_script",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex browser-measure"
-					}
-				]
-			},
-			{
-				"matcher": "apply_patch|Edit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex source-edit"
-					},
-					{
-						"type": "command",
-						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-tailwind-source-exclusion"
-					},
-					{
-						"type": "command",
-						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-agent-harness-sync"
-					}
-				]
-			}
-		],
-		"Stop": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-korean-response.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" stop codex"
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-feasibility-verdict.sh\""
-					},
-					{
-						"type": "command",
-						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-unverified-claims.sh\""
-					}
-				]
-			}
-		]
-	}
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.harness/sync.sh\" session"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-why-explanation.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-status-verification.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-single-best-practice.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-feasibility-verdict.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/confirm-edit-on-report-request.sh\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-attribution-trailers.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/enforce-commit-msg-style.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/git-safety-guard.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-lint-warnings-on-commit.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-branch-guard"
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" confirm-edit-on-report-request"
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" block-em-dash-in-source"
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" block-comment-line-wrap"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-feasibility-verdict.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__figma__get_design_context",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex figma-context"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__figma__get_screenshot",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex figma-screenshot"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__playwright__browser_take_screenshot|mcp__chrome_devtools__take_screenshot",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex browser-screenshot"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__playwright__browser_evaluate|mcp__chrome_devtools__evaluate_script",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex browser-measure"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" record codex source-edit"
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-tailwind-source-exclusion"
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-agent-harness-sync"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-korean-response.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-figma-visual-verification.sh\" stop codex"
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-feasibility-verdict.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-unverified-claims.sh\""
+          }
+        ]
+      }
+    ]
+  }
 }
