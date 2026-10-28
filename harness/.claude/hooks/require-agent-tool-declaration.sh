@@ -2,14 +2,16 @@
 # PreToolUse(Agent) 훅: 스폰 지시문에 `필요 도구:` 선언이 없거나, 선언한 도구가 대상 에이전트 정의의 tools에 없으면 차단, 통과하면 선언 줄을 지운 지시문으로 실행
 # 사용법: 지시문에 `필요 도구: Read, Edit, Bash` 한 줄을 넣음, 도구가 필요 없으면 `필요 도구: 없음`
 # 지시문 자연어에서 필요 도구를 추정하면 오탐·누락이 생겨, 작성자가 선언하고 훅은 정의 파일과 대조만 함
-# 선언에서 필요한 도구를 빠뜨린 경우는 잡지 못함
+# 선언에서 필요한 도구를 빠뜨린 경우는 잡지 못함, 단 기존 파일 수정에 Edit를 빠뜨린 경우는 `수정 파일:` 줄로 잡음
+# `수정 파일: 경로, 경로`에 이미 있는 파일이 있으면 Edit 선언을 요구함(Write로 통째 재작성하는 우회 방지), 고칠 파일이 없으면 `수정 파일: 없음`
+# Edit 없이 Write를 선언하면 `수정 파일:` 줄을 요구함, 줄이 빠지면 같은 구멍이 남기 때문
 # 선언은 orchestrator의 확인 기록이라 subagent에 넘기지 않음, 통과하면 updatedInput으로 그 줄을 지움
 # updatedInput은 allow와 함께 써야 하며, ask는 스폰마다 의미 없는 확인 창을 띄워 쓰지 않음
 # allow를 돌려줘도 사용자 설정의 deny·ask 권한 규칙과 다른 훅의 deny는 그대로 우선함
 
 input=$(cat)
 
-printf '%s' "$input" | AGENTS_DIR="${CLAUDE_PROJECT_DIR:-.}/.claude/agents" python3 -c '
+printf '%s' "$input" | PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}" AGENTS_DIR="${CLAUDE_PROJECT_DIR:-.}/.claude/agents" python3 -c '
 import json, os, re, sys
 
 try:
@@ -50,6 +52,22 @@ def allow_without_declaration():
 declared = [name for name in re.split(r"[\s,]+", declaration.group(1)) if name]
 if declared == ["없음"]:
     allow_without_declaration()
+
+targets_line = re.search(r"^\W*수정 파일\s*:\s*(.+)$", prompt, re.M)
+targets = [t.strip() for t in targets_line.group(1).split(",") if t.strip()] if targets_line else []
+if "Write" in declared and "Edit" not in declared and not targets:
+    sys.stderr.write(
+        "차단: Edit 없이 Write를 선언했는데 `수정 파일:` 줄이 없습니다.\n"
+        "기존 파일을 고치면 `수정 파일: 경로`를 적고 Edit를 선언하세요. 새 파일만 만들면 `수정 파일: 없음`을 적으세요.\n"
+    )
+    sys.exit(2)
+existing = [t for t in targets if t != "없음" and os.path.isfile(os.path.join(os.environ["PROJECT_DIR"], t))]
+if existing and "Edit" not in declared:
+    sys.stderr.write(
+        "차단: 이미 있는 파일을 수정하는데 Edit를 선언하지 않았습니다: " + ", ".join(existing) + "\n"
+        "Edit를 선언하세요. 대상 에이전트에 Edit가 없으면 Write 통째 재작성으로 대신하지 말고 사용자에게 보고하세요.\n"
+    )
+    sys.exit(2)
 
 # 에이전트 이름이 경로 조작에 쓰이지 않도록 파일명 문자만 허용
 if not re.fullmatch(r"[\w.-]+", agent):
