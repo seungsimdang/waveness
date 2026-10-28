@@ -1,5 +1,9 @@
 # 하네스 변경 이력
 
+## 2026-10-28 받기 커밋 실패 시 받은 파일 되돌림
+
+- 자동 받기의 프로젝트 커밋이 pre-commit 등으로 실패하면 받은 파일과 `.harness/lock.json`을 HEAD로 되돌림. seungness 훅 받기(`upstream`)도 같은 방식으로 `harness/`와 `.harness/upstream.json`을 되돌림. 스테이징된 채로 남아 이후 동기화가 미커밋 변경 때문에 계속 건너뛰던 문제 해결. 원인을 고치면 다음 실행에서 다시 받음.
+
 ## 2026-10-28 에이전트 커밋의 lint 경고 차단 훅 추가
 
 - Claude·Codex PreToolUse(Bash)에 `block-lint-warnings-on-commit.sh` 등록. 프로젝트 lint 스크립트 설정과 무관하게 linter 설정 파일로 명령을 정하고 경고도 실패로 처리하는 옵션을 붙여 실행.

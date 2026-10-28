@@ -296,8 +296,11 @@ function autoPull(project) {
     // Harness-Sync: 프로젝트 짝 검사(check-harness-pair-commit) 통과용. 짝 일치는 waveness spec.test가 검사함
     "-m", "Harness-Sync: 공용 하네스 동기화\nHarness-Scope: sync",
   ], { cwd: project });
-  if (commit.status !== 0)
-    return `받기 커밋 실패(변경은 스테이징됨): ${commit.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`;
+  if (commit.status !== 0) {
+    // 스테이징된 채로 두면 다음 받기가 '스테이징된 변경이 있음'으로 계속 건너뛰므로 되돌림
+    git(project, "restore", "--staged", "--worktree", "--source=HEAD", "--", ...touched);
+    return `받기 커밋 실패(변경은 되돌림, 원인을 고치면 다음 세션 시작 때 다시 받음. 바로 받으려면 node ${HUB}/bin/harness.mjs pull ${project}): ${commit.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`;
+  }
   return `공용 하네스 받기: waveness ${head.slice(0, 7)}, 파일 ${steps.length}개 커밋`;
 }
 
@@ -490,8 +493,11 @@ function upstream() {
       "commit", "-q", "-m", "chore(harness): seungness 훅 동기화",
       "-m", `- seungness ${synced.slice(0, 7)} 기준${received.length ? `, 받은 파일 ${received.length}개` : ""}`,
     ], { cwd: HUB });
-    if (committed.status !== 0)
-      return [...notes, `seungness 훅 받기 커밋 실패(변경은 스테이징됨): ${committed.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`];
+    if (committed.status !== 0) {
+      // 스테이징된 채로 두면 다음 동기화가 미커밋 변경 때문에 계속 건너뛰므로 되돌림. seungness에 올린 커밋은 다음 동기화가 받음
+      git(HUB, "restore", "--staged", "--worktree", "--source=HEAD", "--", PREFIX, ".harness/upstream.json");
+      return [...notes, `seungness 훅 받기 커밋 실패(변경은 되돌림, 다음 동기화 때 다시 받음): ${committed.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`];
+    }
     if (received.length) notes.push(`seungness에서 훅·등록 파일 ${received.length}개 받음`);
     if (!pushMain(HUB)) notes.push("waveness push 실패: 훅 동기화 커밋이 waveness 로컬에만 있음");
     return notes;

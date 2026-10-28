@@ -185,6 +185,32 @@ test("충돌이 나면 자동 받기는 파일을 쓰지 않음", () => {
   }
 });
 
+test("프로젝트 커밋이 실패하면 자동 받기는 받은 파일을 되돌려 다음 받기가 멈추지 않음", () => {
+  const { root, hub, project } = setup();
+  try {
+    run(hub, "pull", project);
+    git(project, "add", "-A");
+    commit(project, "chore: 하네스 연결", "Harness-Scope: sync");
+    const lock = read(project, ".harness/lock.json");
+    writeFileSync(join(hub, "harness/CLAUDE.md"), "원본 개선\n");
+    writeFileSync(join(hub, "harness/docs/agent-rules/new-rule.md"), "새 규칙\n");
+    git(hub, "add", ".");
+    commit(hub, "docs: 범용");
+    git(hub, "push", "-q", "origin", "HEAD:main");
+    writeFileSync(join(project, ".git/hooks/pre-commit"), "#!/bin/sh\necho 린트 실패 >&2\nexit 1\n", { mode: 0o755 });
+
+    assert.match(run(hub, "auto", project, "pull"), /받기 커밋 실패\(변경은 되돌림.*린트 실패/);
+    assert.equal(git(project, "status", "--porcelain"), "");
+    assert.equal(read(project, ".harness/lock.json"), lock);
+
+    rmSync(join(project, ".git/hooks/pre-commit"));
+    assert.match(run(hub, "auto", project, "pull"), /공용 하네스 받기: waveness \w+, 파일 2개 커밋/);
+    assert.equal(read(project, "CLAUDE.md"), "원본 개선\n");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("waveness 커밋이 실패하면 자동 올리기는 harness/를 되돌리고 문제를 systemMessage로 알림", () => {
   const { root, hub, project } = setup();
   try {
@@ -349,6 +375,28 @@ test("seungness 훅 동기화는 양쪽 변경을 3-way 병합해 두 저장소�
     git(up, "push", "-q", "origin", "HEAD:main");
     assert.match(sync(), /seungness에서 훅·등록 파일 1개 받음/);
     assert.equal(existsSync(join(hub, "harness/.claude/hooks/c.sh")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("seungness 훅 받기 커밋이 실패하면 waveness를 되돌려 다음 동기화가 멈추지 않음", () => {
+  const { root, up, hub, sync } = setupUpstream();
+  try {
+    const state = read(hub, ".harness/upstream.json");
+    writeFileSync(join(up, "harness/.claude/hooks/a.sh"), "1 seungness\n2\n3\n4\n5\n");
+    git(up, "add", ".");
+    commit(up, "fix: a 첫 줄");
+    git(up, "push", "-q", "origin", "HEAD:main");
+    writeFileSync(join(hub, ".git/hooks/pre-commit"), "#!/bin/sh\necho 테스트 실패 >&2\nexit 1\n", { mode: 0o755 });
+
+    assert.match(sync(), /seungness 훅 받기 커밋 실패\(변경은 되돌림.*테스트 실패/);
+    assert.equal(git(hub, "status", "--porcelain"), "");
+    assert.equal(read(hub, ".harness/upstream.json"), state);
+
+    rmSync(join(hub, ".git/hooks/pre-commit"));
+    assert.match(sync(), /seungness에서 훅·등록 파일 1개 받음/);
+    assert.equal(read(hub, "harness/.claude/hooks/a.sh"), "1 seungness\n2\n3\n4\n5\n");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
