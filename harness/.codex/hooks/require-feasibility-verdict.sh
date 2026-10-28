@@ -22,7 +22,7 @@ esac
 input=$(cat)
 
 printf '%s' "$input" | JUDGE_TOOL="$judge_tool" MARK_DIR="${TMPDIR:-/tmp}/feasibility-verdict" python3 -c '
-import json, os, re, subprocess, sys, tempfile
+import json, os, re, stat, subprocess, sys, tempfile
 
 JUDGE_TIMEOUT_SECONDS = 60
 
@@ -73,8 +73,20 @@ if event != "Stop":
     # 표시는 Stop에서 판정이 끝난 뒤(통과 또는 한 번 막은 뒤의 재응답)에만 지움
     # 작업 중에 들어온 질문도 함께 재판정하도록 후보 문장을 이어 붙여 둠
     if keyword and question:
-        os.makedirs(os.environ["MARK_DIR"], exist_ok=True)
-        with open(mark, "a", encoding="utf-8") as candidates:
+        mark_dir = os.environ["MARK_DIR"]
+        os.makedirs(mark_dir, mode=0o700, exist_ok=True)
+        directory = os.lstat(mark_dir)
+        if not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.getuid():
+            sys.exit(0)
+        os.chmod(mark_dir, 0o700)
+
+        fd = os.open(mark, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+        file_info = os.fstat(fd)
+        if not stat.S_ISREG(file_info.st_mode) or file_info.st_uid != os.getuid():
+            os.close(fd)
+            sys.exit(0)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as candidates:
             candidates.write(prompt.strip() + "\n---\n")
     sys.exit(0)
 

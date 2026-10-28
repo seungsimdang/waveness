@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-10-28 chore(harness): 가능 여부 판정 훅 임시 파일 권한 제한
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@2b18642837af9a10812d906777c4b47f344f7154`
+
+> - 사용자 입력이 저장되는 임시 디렉터리와 파일의 접근 권한 제한
+
 ## 2026-10-28 받기 커밋 실패 시 받은 파일 되돌림
 
 - 자동 받기의 프로젝트 커밋이 pre-commit 등으로 실패하면 받은 파일과 `.harness/lock.json`을 HEAD로 되돌림. seungness 훅 받기(`upstream`)도 같은 방식으로 `harness/`와 `.harness/upstream.json`을 되돌림. 스테이징된 채로 남아 이후 동기화가 미커밋 변경 때문에 계속 건너뛰던 문제 해결. 원인을 고치면 다음 실행에서 다시 받음.
