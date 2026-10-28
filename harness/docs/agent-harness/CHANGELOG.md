@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-10-28 공용 lint 회귀 검사 배포
+
+- 포트폴리오 lint 테스트에서 명세 필수 절·팀 통신, 런타임 훅·Codex 어댑터, 인덱스 기반 소스·문서 검사, Biome 한글 테스트 제목 검사와 검사기를 `.harness/`로 분리.
+- 기존 `.harness/` 동기화 경로를 사용하고 연결 프로젝트 commit-msg에서 공용 테스트 전체 실행. 주석 검사기의 프로젝트 소유 파일이 없는 경우 공용 검사기로 대체.
+- 프로젝트별 모델 이름·작성자·스택·앱 경로는 강제하지 않으며 Biome 미설치 검사는 사유와 함께 건너뜀.
+
 ## 2026-10-27 Codex 역할 모델·effort를 Claude 기준으로 정렬
 
 - 대상: `.codex/agents/spec-planner.toml`, `implementer.toml`, `integration-reviewer.toml`

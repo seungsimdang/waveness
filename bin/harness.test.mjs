@@ -444,3 +444,34 @@ test("seungness 훅 동기화는 훅 등록을 항목 단위로 주고받고 전
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사이를 양방향 동기화함", () => {
+  const { root, up, hub, sync } = setupUpstream();
+  try {
+    const paths = read(SRC, ".harness/upstream-paths").split("\n").filter((line) => line.startsWith(".harness/"));
+    for (const file of ["spec.test.mjs", "runtime-hooks.test.mjs", "git-guards.test.mjs", "test-titles.test.mjs", "check-comment-line-breaks.mjs", "korean-test-titles.grit"])
+      assert.ok(paths.includes(`.harness/${file}`), file);
+    appendFileSync(join(hub, ".harness/upstream-paths"), `${paths.join("\n")}\n`);
+    for (const dir of [up, hub]) mkdirSync(join(dir, "harness/.harness"), { recursive: true });
+    writeFileSync(join(up, "harness/.harness/runtime-hooks.test.mjs"), "// 받은 검사\n");
+    git(up, "add", ".");
+    commit(up, "test: 공용 검사 추가");
+    git(up, "push", "-q", "origin", "HEAD:main");
+    writeFileSync(join(hub, "harness/.harness/korean-test-titles.grit"), "플러그인\n");
+    git(hub, "add", ".");
+    commit(hub, "test: 플러그인 추가");
+    assert.match(sync(), /seungness/);
+    for (const dir of [up, hub]) {
+      assert.equal(read(dir, "harness/.harness/runtime-hooks.test.mjs"), "// 받은 검사\n");
+      assert.equal(read(dir, "harness/.harness/korean-test-titles.grit"), "플러그인\n");
+    }
+    appendFileSync(join(hub, "harness/.harness/runtime-hooks.test.mjs"), "// 프로젝트에서 보완\n");
+    git(hub, "add", ".");
+    commit(hub, "test: 공용 검사 보완");
+    assert.match(sync(), /seungness로/);
+    assert.equal(read(up, "harness/.harness/runtime-hooks.test.mjs"), read(hub, "harness/.harness/runtime-hooks.test.mjs"));
+    assert.equal(sync(), "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

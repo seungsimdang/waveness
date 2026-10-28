@@ -1,0 +1,48 @@
+engine biome(1.0)
+language js(typescript, jsx)
+`$callee($title, $...)` as $call where {
+  or {
+    $callee <: r"(?:test|it|describe)(?:\.(?:describe|only|skip|fixme|todo|serial|parallel))*",
+    and {
+      $program <: contains JsNamedImportSpecifier(local_name = $alias) as $specifier where { $specifier <: r"(?:test|it|describe) as .*" },
+      $callee <: contains $alias,
+      or { $callee <: $alias, $callee <: r".*\.(?:describe|only|skip|fixme|todo|serial|parallel)(?:\.(?:describe|only|skip|fixme|todo|serial|parallel))*" }
+    },
+    and {
+      $program <: contains JsImport() as $import where {
+        $import <: r"(?s).*['\"]node:test['\"].*",
+        $import <: contains JsDefaultImportSpecifier(local_name = $default)
+      },
+      $callee <: contains $default,
+      or { $callee <: $default, $callee <: r".*\.(?:describe|only|skip|fixme|todo|serial|parallel)(?:\.(?:describe|only|skip|fixme|todo|serial|parallel))*" }
+    },
+    and {
+      $program <: contains JsImport() as $namespaceImport where {
+        $namespaceImport <: r"(?s).*['\"](?:@playwright/test|node:test|vitest)['\"].*",
+        $namespaceImport <: contains JsNamespaceImportSpecifier(local_name = $namespace)
+      },
+      $callee <: contains $namespace,
+      $callee <: r".*\.(?:test|it|describe)(?:\.(?:describe|only|skip|fixme|todo|serial|parallel))*"
+    }
+  },
+  not $title <: or { JsBooleanLiteralExpression(), JsArrowFunctionExpression(), JsFunctionExpression() },
+  not $call <: `$callee($condition, $reason)` where {
+    $callee <: r".*\.(?:skip|fixme)",
+    $reason <: JsStringLiteralExpression()
+  },
+  or {
+    and {
+      $title <: JsStringLiteralExpression(),
+      or { not $title <: r".*[가-힣].*", $title <: r".*[A-Za-z].*" }
+    },
+    and {
+      $title <: JsTemplateExpression(),
+      or {
+        not $title <: contains JsTemplateChunkElement() as $chunk where { $chunk <: r".*[가-힣].*" },
+        $title <: contains JsTemplateChunkElement() as $english where { $english <: r".*[A-Za-z].*" }
+      }
+    },
+    not $title <: or { JsStringLiteralExpression(), JsTemplateExpression() }
+  },
+  register_diagnostic(span = $title, message = "테스트 제목의 설명은 한글 리터럴로 작성해야 합니다.")
+}

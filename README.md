@@ -60,3 +60,5 @@ node bin/harness.mjs pull <프로젝트>   # 받기. 충돌 표시를 남기고 
 node bin/harness.mjs push <프로젝트>   # 올리기. 프로젝트의 generic 커밋을 waveness 현재 브랜치에 커밋, push는 직접
 node bin/harness.mjs auto <프로젝트> [pull|push|both]   # 훅과 같은 자동 동작
 ```
+
+공용 명세·훅·소스 회귀 검사는 `harness/.harness/`에 있으며 `node --test bin/*.test.mjs harness/.harness/*.test.mjs`로 검증한다. 연결 프로젝트에는 기존 `.harness/` 경로로 배포하고 commit-msg에서 전체 검사를 실행한다. 검사·플러그인은 `.harness/upstream-paths`에 포함되어 seungness와 기존 3-way 병합으로 양방향 동기화된다.

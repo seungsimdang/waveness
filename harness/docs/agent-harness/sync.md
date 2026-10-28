@@ -90,3 +90,13 @@ waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.
 - 반영: seungness에는 `chore(harness): waveness 훅 동기화` 커밋(`Harness-Origin: waveness@{커밋}`)을 만들어 main에 push하고, waveness에는 같은 내용과 `upstream.json` 갱신을 커밋해 push한다.
 - 건너뛰는 경우: 두 저장소 중 하나가 main이 아니거나 미커밋 변경이 있을 때. 다음 시점에 다시 시도한다.
 - 충돌: 표시된 파일을 양쪽에서 같은 내용으로 맞춰 각각 커밋한다. waveness 커밋이 나중이면 커밋 직후 다시 동기화되고, seungness 커밋이 나중이면 다음 waveness 세션 시작이나 커밋 때 다시 동기화된다.
+
+## 공용 회귀 검사
+
+`.harness/*.test.mjs`와 함께 쓰는 검사기·Biome 플러그인은 `.harness/` 동기화 대상에 포함된다. 허브 pre-commit과 연결 프로젝트의 `check-scope.sh`는 공용 테스트 전체를 실행한다. 수동 검증은 `node --test .harness/*.test.mjs`로 실행한다(허브: `node --test bin/*.test.mjs harness/.harness/*.test.mjs`).
+
+명세의 필수 절·팀 통신·메타데이터, Claude·Codex 짝 일치, 훅 정상·위반 입력, Codex 어댑터, Git 인덱스 기반 소스·문서 검사기를 검증한다. 모델 선택은 프로젝트마다 다르므로 특정 모델 이름 대신 필수 메타데이터 형식을 검사한다. Stop 판정 CLI는 고정 응답으로 대체하며 실제 LLM 품질은 검증하지 않는다.
+
+한글 테스트 제목의 Biome 플러그인은 `.harness/korean-test-titles.grit`로 배포한다. Biome를 사용하는 프로젝트는 설정의 `plugins`에 `./.harness/korean-test-titles.grit`를 등록한다. 회귀 테스트는 해당 프로젝트의 `node_modules/.bin/biome`로 실행하며 Biome가 없으면 사유를 표시하고 건너뛴다. 공용화 과정에서 프로젝트의 패키지나 린트 설정을 덮어쓰지 않는다.
+
+소스·문서 검사기는 `.harness/check-*.sh`와 `.harness/check-comment-line-breaks.mjs`로 배포한다. 주석 훅은 프로젝트 `scripts/` 검사기를 우선하고, 없으면 공용 검사기를 사용한다. Git 인덱스 검사기의 lint-staged 연결 여부는 프로젝트가 정한다. 작성자 강제·프로젝트 병합 정책·React Doctor·Tailwind·admin 및 UI 컴포넌트 검사는 프로젝트 소유로 유지한다.

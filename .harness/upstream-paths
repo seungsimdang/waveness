@@ -18,3 +18,14 @@
 !.codex/hooks/enforce-commit-msg-style.sh
 !.codex/hooks/require-coderabbit-run.sh
 !.codex/hooks/require-figma-visual-verification.sh
+
+# 공용 테스트·검사기도 훅과 같은 3-way 병합으로 양방향 동기화
+.harness/check-em-dash-in-source.sh
+.harness/test-titles.test.mjs
+.harness/spec.test.mjs
+.harness/runtime-hooks.test.mjs
+.harness/check-ephemeral-comment-refs.sh
+.harness/check-comment-line-breaks.mjs
+.harness/korean-test-titles.grit
+.harness/git-guards.test.mjs
+.harness/check-markdown-line-wrap.sh

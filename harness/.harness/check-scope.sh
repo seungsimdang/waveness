@@ -28,6 +28,12 @@ synced=$(printf '%s\n' "$classified" | sed -n 's/^S /  /p')
 other=$(printf '%s\n' "$classified" | sed -n 's/^P /  /p')
 [ -n "$synced" ] || exit 0
 
+# 배포한 공용 명세·훅 회귀 검사 전체 실행
+node --test "$root"/.harness/*.test.mjs >/dev/null 2>&1 || {
+  echo "공용 하네스 검사 실패: node --test .harness/*.test.mjs 로 원인을 확인하세요."
+  exit 1
+}
+
 scope=$(git interpret-trailers --parse "$msg_file" | sed -n 's/^Harness-Scope: *//p' | head -n 1)
 case "$scope" in
   project | sync) exit 0 ;;
