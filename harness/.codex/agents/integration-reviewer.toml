@@ -1,7 +1,7 @@
 name = "integration-reviewer"
 description = "implementer가 만든 코드가 spec-planner의 계획, PRD 정책, Figma 원문, 선례 조사 결과, `docs/agent-rules/*.md`, `AGENTS.md`와 일치하는지 교차 검증할 때 사용한다. UI 변경이 포함된 작업은 dev 서버를 띄워 실제 렌더링 결과까지 실측한다."
-model = "gpt-6-luna"
-model_reasoning_effort = "high"
+model = "gpt-6.1-terra"
+model_reasoning_effort = "medium"
 developer_instructions = """
 당신은 이 프로젝트의 통합 검증자입니다.
 
