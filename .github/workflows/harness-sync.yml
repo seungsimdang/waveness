@@ -1,0 +1,33 @@
+name: Harness Sync
+on:
+  push:
+    branches: [main]
+    paths: ['harness/**', 'bin/**', 'templates/**', '.harness/projects.json', '.github/workflows/harness-sync.yml']
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: harness-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 인증 등록 확인
+        env:
+          HARNESS_SYNC_TOKEN: ${{ secrets.HARNESS_SYNC_TOKEN }}
+        run: test -n "$HARNESS_SYNC_TOKEN" || { echo 'HARNESS_SYNC_TOKEN 등록 필요' >&2; exit 1; }
+      - name: PR 생성·검사 결과 확인·자동 병합
+        env:
+          HARNESS_SYNC_TOKEN: ${{ secrets.HARNESS_SYNC_TOKEN }}
+          HARNESS_PROJECT_TOKEN: ${{ secrets.HARNESS_PROJECT_TOKEN }}
+        run: node bin/harness-automation.mjs run

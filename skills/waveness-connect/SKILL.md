@@ -5,7 +5,7 @@ description: 현재 프로젝트를 회사 공용 에이전트 하네스(wavenes
 
 # 공용 하네스 연결
 
-현재 프로젝트에 waveness `harness/`를 받아 오고, 이후 세션 시작·커밋 때 자동으로 주고받도록 설정한다. 규칙 원문은 waveness `README.md`의 "프로젝트 연결"과 `harness/docs/agent-harness/sync.md`다.
+현재 프로젝트에 waveness `harness/`를 받아 오고, 이후 서버에서 업데이트 PR을 생성하고 검사 후 병합하도록 등록한다. 세션 시작은 업데이트 안내만 수행한다. 규칙 원문은 waveness `README.md`의 "프로젝트 연결"과 `harness/docs/agent-harness/sync.md`다.
 
 ## 0. 확인
 
@@ -41,7 +41,10 @@ node "$HUB/bin/harness.mjs" pull .
 프로젝트 훅 도구에 맞춰 등록한다. Husky면 `.husky/`, `core.hooksPath`가 있으면 그 폴더, 둘 다 없으면 사용자에게 방식을 묻는다.
 
 - commit-msg: `sh .harness/check-scope.sh "$1"`
-- post-commit, post-merge: `sh .harness/sync.sh commit`
+- 기존 post-commit·post-merge의 `sh .harness/sync.sh commit`은 호환용이며 새 등록은 필요하지 않음
+- 프로젝트 규칙에서 통합 브랜치를 확인한 뒤 `node "$HUB/bin/harness-automation.mjs" register . <통합 브랜치>` 실행. 원격 쓰기 권한·브랜치·서버 인증을 검사하고 허브 프로젝트 목록·프로젝트 검사 워크플로·lock의 명시적 브랜치를 함께 준비.
+- 프로젝트와 허브 양쪽 변경을 각각 검증하고 메시지 미리보기·승인 후 커밋·push. 허브 등록만 로컬에 남긴 상태를 연결 완료로 보고하지 않음.
+- push 후 `node "$HUB/bin/harness-automation.mjs" verify-connection .` 실행. 원격 등록과 검사 워크플로 확인에 실패하면 미완료로 보고.
 
 기존 훅 파일이 있으면 끝에 줄을 추가한다.
 

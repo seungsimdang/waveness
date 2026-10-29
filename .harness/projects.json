@@ -1,0 +1,11 @@
+{
+  "hub": "seungsimdang/waveness",
+  "projectAccount": "seunghyunlee-bigwaverobotics",
+  "upstream": "seungsimdang/seungness",
+  "projects": [
+    { "repo": "SOLlink-Industrial/HanwhaAdvancedMaterials-monitoring-frontend", "branch": "main" },
+    { "repo": "SOLlink-Industrial/hkmold-monitoring-frontend", "branch": "main" },
+    { "repo": "SOLlink-Humanoid/samsungshi-scaffolding-frontend", "branch": "develop" },
+    { "repo": "SOLlink-Industrial/trinione_monitoring_frontend", "branch": "develop" }
+  ]
+}

@@ -1,7 +1,7 @@
 // GUI와 같은 제한된 PATH에서 동기화 셸의 실행 경로·실패 안내 검사
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,14 +9,14 @@ import { test } from "node:test";
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../harness/.harness/sync.sh"), "utf8");
 
-for (const scenario of ["기존 경로", "Homebrew 보정", "Node.js 없음", "커밋 로그"]) {
+for (const scenario of ["기존 경로", "Homebrew 보정", "Node.js 없음", "커밋 동작 없음"]) {
   test(`동기화 셸: ${scenario}`, () => {
     const root = mkdtempSync(join(tmpdir(), "sync-shell-"));
     try {
       const bin = join(root, "bin");
       const fallback = join(root, "homebrew");
       for (const dir of [bin, fallback, join(root, ".git")]) mkdirSync(dir);
-      writeFileSync(join(bin, "harness.mjs"), "");
+      writeFileSync(join(bin, "harness-automation.mjs"), "");
       const executable = (file, text) => {
         writeFileSync(file, `#!/bin/sh\n${text}\n`);
         chmodSync(file, 0o755);
@@ -27,7 +27,7 @@ for (const scenario of ["기존 경로", "Homebrew 보정", "Node.js 없음", "�
       }
       // 호스트에 설치된 Node.js와 무관하게 실제 셸의 fallback 분기 검사
       const script = source.replace('/opt/homebrew/bin:/usr/local/bin', fallback);
-      const result = spawnSync("/bin/sh", ["-c", script, "sync.sh", scenario === "커밋 로그" ? "commit" : "session"], {
+      const result = spawnSync("/bin/sh", ["-c", script, "sync.sh", scenario === "커밋 동작 없음" ? "commit" : "session"], {
         cwd: root,
         encoding: "utf8",
         env: { PATH: bin, HARNESS_HUB: root, TEST_ROOT: root },
@@ -36,14 +36,14 @@ for (const scenario of ["기존 경로", "Homebrew 보정", "Node.js 없음", "�
       assert.equal(result.stderr, "");
       if (scenario === "Node.js 없음") {
         assert.match(JSON.parse(result.stdout).systemMessage, /동기화 실패: node/);
-      } else if (scenario === "커밋 로그") {
+      } else if (scenario === "커밋 동작 없음") {
         assert.equal(result.stdout, "");
-        assert.match(readFileSync(join(root, ".git/harness-sync.log"), "utf8"), /동기화 실패: node/);
+        assert.equal(existsSync(join(root, ".git/harness-sync.log")), false);
       } else {
         const output = result.stdout.trim().split("\n");
         assert.equal(output[0], "1");
         assert.equal(output[1], scenario === "기존 경로" ? bin : `${bin}:${fallback}`);
-        assert.deepEqual(output.slice(2), [join(bin, "harness.mjs"), "auto", root, "both"]);
+        assert.deepEqual(output.slice(2), [join(bin, "harness-automation.mjs"), "status", root]);
       }
     } finally {
       rmSync(root, { recursive: true, force: true });

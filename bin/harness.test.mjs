@@ -40,7 +40,7 @@ function setup() {
   return { root, hub, project };
 }
 
-test("처음 받기 후 양방향 자동 동기화에서 프로젝트 전용 변경은 남기고 범용 변경만 올림", () => {
+test("격리 체크아웃의 받기·올리기 준비에서 프로젝트 전용 변경은 남기고 범용 변경만 올림", () => {
   const { root, hub, project } = setup();
   try {
     run(hub, "pull", project);
@@ -63,21 +63,20 @@ test("처음 받기 후 양방향 자동 동기화에서 프로젝트 전용 변
     commit(hub, "docs: 범용 줄");
     git(hub, "push", "-q", "origin", "HEAD:main");
 
-    const out = run(hub, "auto", project);
+    const out = run(hub, "receive", project) + run(hub, "push", project);
     assert.match(out, /공용 하네스 받기/);
-    assert.match(out, /공용 하네스 올리기: 커밋 1개/);
+    assert.match(out, /올리기: waveness 현재 브랜치에 커밋 1개/);
     const agents = read(project, "AGENTS.md");
     assert.ok(agents.startsWith("범용 새 줄\n") && agents.includes("프로젝트 전용 줄"));
     assert.match(git(project, "log", "-1", "--format=%B"), /Harness-Sync: 공용 하네스 동기화\nHarness-Scope: sync/);
 
-    const pushed = join(root, "check");
-    git(root, "clone", "-q", join(root, "remote.git"), pushed);
+    const pushed = hub;
     assert.ok(read(pushed, "harness/docs/agent-rules/git-safety.md").includes("범용 개선 줄"));
     assert.ok(!read(pushed, "harness/AGENTS.md").includes("프로젝트 전용 줄"));
     assert.match(git(pushed, "log", "-1", "--format=%B"), /Harness-Origin: app@/);
 
     // 다시 실행해도 이미 올린 커밋은 건너뜀
-    assert.doesNotMatch(run(hub, "auto", project), /올리기: 커밋/);
+    assert.doesNotMatch(run(hub, "push", project), /현재 브랜치에 커밋 [1-9]/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -93,9 +92,8 @@ test("프로젝트에서 실행 권한만 바꾼 범용 파일도 권한을 올�
     git(project, "add", "docs/agent-rules/git-safety.md");
     commit(project, "chore: 실행 권한", "Harness-Scope: generic");
 
-    assert.match(run(hub, "auto", project), /올리기: 커밋 1개/);
-    const pushed = join(root, "check");
-    git(root, "clone", "-q", join(root, "remote.git"), pushed);
+    assert.match(run(hub, "push", project), /현재 브랜치에 커밋 1개/);
+    const pushed = hub;
     assert.equal(git(pushed, "ls-tree", "HEAD", "harness/docs/agent-rules/git-safety.md").split(" ")[0], "100755");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -143,7 +141,7 @@ test("이전 프로젝트 설정에서도 CHANGELOG는 양방향에서 제외하
     assert.equal(read(project, path), "프로젝트 이력\n");
     git(hub, "push", "-q", "origin", "HEAD:main");
     appendFileSync(join(project, path), "커밋 전 프로젝트 기록\n");
-    assert.doesNotMatch(run(hub, "auto", project, "pull"), /충돌|실패|건너뜀/);
+    assert.doesNotMatch(run(hub, "receive", project), /충돌|실패|건너뜀/);
     assert.equal(read(project, path), "프로젝트 이력\n커밋 전 프로젝트 기록\n");
     assert.ok(read(project, "AGENTS.md").includes("새 범용 규칙"));
     assert.ok(read(project, ".harness/paths").includes(excluded));
@@ -165,7 +163,7 @@ test("이전 프로젝트 설정에서도 CHANGELOG는 양방향에서 제외하
   }
 });
 
-test("충돌이 나면 자동 받기는 파일을 쓰지 않음", () => {
+test("충돌이 나면 격리 받기는 파일을 쓰지 않음", () => {
   const { root, hub, project } = setup();
   try {
     run(hub, "pull", project);
@@ -178,14 +176,14 @@ test("충돌이 나면 자동 받기는 파일을 쓰지 않음", () => {
     git(hub, "add", ".");
     commit(hub, "docs: 범용");
     git(hub, "push", "-q", "origin", "HEAD:main");
-    assert.match(run(hub, "auto", project, "pull"), /받기 보류: 충돌 1건/);
+    assert.match(run(hub, "receive", project), /받기 보류: 충돌 1건/);
     assert.equal(read(project, "CLAUDE.md"), "이쪽\n");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("프로젝트 커밋이 실패하면 자동 받기는 받은 파일을 되돌려 다음 받기가 멈추지 않음", () => {
+test("프로젝트 커밋이 실패하면 격리 받기는 받은 파일을 되돌려 다음 받기가 멈추지 않음", () => {
   const { root, hub, project } = setup();
   try {
     run(hub, "pull", project);
@@ -199,19 +197,19 @@ test("프로젝트 커밋이 실패하면 자동 받기는 받은 파일을 되�
     git(hub, "push", "-q", "origin", "HEAD:main");
     writeFileSync(join(project, ".git/hooks/pre-commit"), "#!/bin/sh\necho 린트 실패 >&2\nexit 1\n", { mode: 0o755 });
 
-    assert.match(run(hub, "auto", project, "pull"), /받기 커밋 실패\(변경은 되돌림.*린트 실패/);
+    assert.match(run(hub, "receive", project), /받기 커밋 실패\(변경은 되돌림.*린트 실패/);
     assert.equal(git(project, "status", "--porcelain"), "");
     assert.equal(read(project, ".harness/lock.json"), lock);
 
     rmSync(join(project, ".git/hooks/pre-commit"));
-    assert.match(run(hub, "auto", project, "pull"), /공용 하네스 받기: waveness \w+, 파일 2개 커밋/);
+    assert.match(run(hub, "receive", project), /공용 하네스 받기: waveness \w+, 파일 2개 커밋/);
     assert.equal(read(project, "CLAUDE.md"), "원본 개선\n");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("waveness 커밋이 실패하면 자동 올리기는 harness/를 되돌리고 문제를 systemMessage로 알림", () => {
+test("waveness 커밋이 실패하면 수동 올리기는 수정 내용을 보존하고 다음 재시도로 반영", () => {
   const { root, hub, project } = setup();
   try {
     run(hub, "pull", project);
@@ -223,16 +221,16 @@ test("waveness 커밋이 실패하면 자동 올리기는 harness/를 되돌리�
     const history = read(hub, "harness/docs/agent-harness/CHANGELOG.md");
     writeFileSync(join(hub, ".git/hooks/pre-commit"), "#!/bin/sh\necho 테스트 실패 >&2\nexit 1\n", { mode: 0o755 });
 
-    const out = spawnSync("node", [join(hub, "bin/harness.mjs"), "auto", project, "push"], {
+    const out = spawnSync("node", [join(hub, "bin/harness.mjs"), "push", project], {
       env: { ...ENV, HARNESS_HOOK_JSON: "1" },
     }).stdout.toString();
-    assert.match(JSON.parse(out).systemMessage, /올리기 중단: app@\w+ waveness 커밋 실패.*테스트 실패/);
-    assert.equal(git(hub, "status", "--porcelain"), "");
-    assert.equal(read(hub, "harness/docs/agent-harness/CHANGELOG.md"), history);
+    assert.match(out, /현재 브랜치에 커밋 0개/);
+    assert.notEqual(git(hub, "status", "--porcelain"), "");
+    assert.notEqual(read(hub, "harness/docs/agent-harness/CHANGELOG.md"), history);
 
     // 실패한 커밋은 올린 기록이 없어 원인을 고치면 다음 실행에서 올라감
     rmSync(join(hub, ".git/hooks/pre-commit"));
-    assert.match(run(hub, "auto", project, "push"), /공용 하네스 올리기: 커밋 1개/);
+    assert.match(run(hub, "push", project), /올리기: waveness 현재 브랜치에 커밋 1개/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -329,11 +327,11 @@ function setupUpstream() {
   commit(hub, "bin");
   git(hub, "push", "-q", "origin", "HEAD:main");
   const sync = () =>
-    spawnSync("node", [join(hub, "bin/harness.mjs"), "upstream"], { env: { ...ENV, UPSTREAM_HUB: up } }).stdout.toString();
+    spawnSync("node", [join(hub, "bin/harness.mjs"), "prepare-upstream"], { env: { ...ENV, UPSTREAM_HUB: up } }).stdout.toString();
   return { root, up, hub, sync };
 }
 
-test("seungness 훅 동기화는 양쪽 변경을 3-way 병합해 두 저장소에 커밋·push하고 전용 훅은 올리지 않음", () => {
+test("seungness 훅 동기화는 양쪽 변경을 3-way 병합해 두 격리 저장소에 커밋하고 원격은 유지하며 전용 훅은 올리지 않음", () => {
   const { root, up, hub, sync } = setupUpstream();
   try {
     writeFileSync(join(up, "harness/.claude/hooks/a.sh"), "1 seungness\n2\n3\n4\n5\n");
@@ -362,7 +360,7 @@ test("seungness 훅 동기화는 양쪽 변경을 3-way 병합해 두 저장소�
     assert.ok(history.includes("> - fix: waveness 훅 수정") && history.endsWith("## 이전 항목\n"));
     assert.equal(JSON.parse(read(hub, ".harness/upstream.json")).synced, git(up, "rev-parse", "HEAD"));
     for (const name of ["seungness", "waveness"])
-      assert.equal(git(root, "--git-dir", join(root, `${name}.git`), "rev-parse", "main"), git(join(root, name), "rev-parse", "HEAD"));
+      assert.notEqual(git(root, "--git-dir", join(root, `${name}.git`), "rev-parse", "main"), git(join(root, name), "rev-parse", "HEAD"));
 
     // 바뀐 것이 없으면 커밋하지 않음
     const heads = [git(up, "rev-parse", "HEAD"), git(hub, "rev-parse", "HEAD")];

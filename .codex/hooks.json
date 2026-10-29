@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "HARNESS_HOOK_JSON=1 node \"$(git rev-parse --show-toplevel)/bin/harness.mjs\" upstream"
+            "command": "HARNESS_HOOK_JSON=1 node \"$(git rev-parse --show-toplevel)/bin/harness-automation.mjs\" status-hubs"
           }
         ]
       }

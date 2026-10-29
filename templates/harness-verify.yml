@@ -1,0 +1,49 @@
+name: Harness Verify
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: 하네스 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: pnpm 버전 확인
+        id: pm
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: node -e 'const p=require("./package.json"); console.log("version="+(p.packageManager?.replace(/^pnpm@/, "") ?? "10"))' >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v4
+        if: hashFiles('pnpm-lock.yaml') != ''
+        with:
+          version: ${{ steps.pm.outputs.version }}
+          run_install: false
+      - name: 의존성 설치
+        env:
+          HUSKY: '0'
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile;
+          elif [ -f package-lock.json ]; then npm ci;
+          elif [ -f package.json ]; then echo '지원할 고정 lockfile 필요' >&2; exit 1; fi
+      - name: 공용 하네스와 프로젝트 계약 검사
+        env:
+          HUSKY: '0'
+        run: |
+          node --test .harness/*.test.mjs
+          node --input-type=module <<'JS'
+          import { existsSync, readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          if (existsSync('package.json')) {
+            const scripts = JSON.parse(readFileSync('package.json')).scripts ?? {};
+            const pm = existsSync('pnpm-lock.yaml') ? 'pnpm' : 'npm';
+            for (const name of ['harness:test', ['type-check', 'typecheck'].find(k => scripts[k]), ['check', 'lint'].find(k => scripts[k])].filter(k => k && scripts[k]))
+              execFileSync(pm, ['run', name], { stdio: 'inherit' });
+          }
+          JS

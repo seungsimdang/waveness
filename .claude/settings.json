@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "HARNESS_HOOK_JSON=1 node \"$CLAUDE_PROJECT_DIR/bin/harness.mjs\" upstream"
+            "command": "HARNESS_HOOK_JSON=1 node \"$CLAUDE_PROJECT_DIR/bin/harness-automation.mjs\" status-hubs"
           }
         ]
       }

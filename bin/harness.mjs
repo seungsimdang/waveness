@@ -1,8 +1,8 @@
 // 공용 하네스(harness/)와 프로젝트 하네스를 3-way 병합으로 주고받는 도구
 // pull <프로젝트>: lock 커밋..HEAD 변경을 병합하고 lock 갱신. 충돌 표시를 남기며 커밋은 사람이 함
 // push <프로젝트>: 통합 브랜치의 `Harness-Scope: generic` 커밋을 waveness 현재 브랜치에 커밋별로 반영
-// auto <프로젝트> pull|push|both: 훅용. 조건이 안 맞으면 건너뛰고, 받기는 sync 커밋, 올리기는 waveness main에 push까지 함
-// upstream: waveness harness/의 훅 스크립트와 훅 등록을 seungness harness/와 양방향 3-way 병합(.harness/upstream-paths·upstream.json). auto 시작 때도 실행
+// auto <프로젝트>: 이전 훅과 호환되는 읽기 전용 상태 안내
+// prepare-upstream: 격리 체크아웃의 허브 간 PR 내용 준비, 원격 변경 없음
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -273,9 +273,6 @@ function withLock(project, fn) {
   }
 }
 
-const hubReady = () =>
-  gitText(HUB, "branch", "--show-current") === "main" && !gitText(HUB, "status", "--porcelain");
-
 function autoPull(project) {
   if (!gitOk(project, "diff", "--cached", "--quiet")) return "받기 건너뜀: 스테이징된 변경이 있음";
   const synced = syncPaths(project);
@@ -304,19 +301,6 @@ function autoPull(project) {
   return `공용 하네스 받기: waveness ${head.slice(0, 7)}, 파일 ${steps.length}개 커밋`;
 }
 
-function autoPush(project) {
-  if (!hubReady()) return "올리기 건너뜀: waveness가 main이 아니거나 커밋하지 않은 변경이 있음";
-  const { made, stopped } = push(project, { manual: false });
-  const notes = stopped ? [`올리기 중단: ${stopped}`] : [];
-  if (!made) return notes.join("\n") || null;
-  // 다른 프로젝트가 먼저 push했으면 한 번 rebase 후 다시 시도
-  if (!gitOk(HUB, "push", "-q", "origin", "HEAD:main") &&
-    !(gitOk(HUB, "pull", "-q", "--rebase", "origin", "main") && gitOk(HUB, "push", "-q", "origin", "HEAD:main")))
-    notes.push(`올리기 push 실패: waveness에 커밋 ${made}개가 로컬에만 있음`);
-  else notes.unshift(`공용 하네스 올리기: 커밋 ${made}개`);
-  return notes.join("\n");
-}
-
 // git ls-tree -r 결과를 harness/ 기준 경로 → "모드 sha" 맵으로 읽음
 function tree(repo, rev, include) {
   const entries = new Map();
@@ -331,11 +315,6 @@ function tree(repo, rev, include) {
 
 const repoReady = (repo) =>
   gitText(repo, "branch", "--show-current") === "main" && !gitText(repo, "status", "--porcelain");
-
-function pushMain(repo) {
-  return gitOk(repo, "push", "-q", "origin", "HEAD:main") ||
-    (gitOk(repo, "pull", "-q", "--rebase", "origin", "main") && gitOk(repo, "push", "-q", "origin", "HEAD:main"));
-}
 
 const HOOK_CONFIGS = [".claude/settings.json", ".codex/hooks.json"];
 
@@ -424,9 +403,6 @@ function upstream() {
   if (!repoReady(HUB) || !repoReady(up))
     return ["seungness 훅 동기화 건너뜀: waveness 또는 seungness가 main이 아니거나 커밋하지 않은 변경이 있음"];
   return withLock(HUB, () => {
-    // 네트워크가 없으면 로컬 저장소 그대로 진행
-    gitOk(HUB, "pull", "-q", "--ff-only", "origin", "main");
-    gitOk(up, "pull", "-q", "--ff-only", "origin", "main");
     const state = JSON.parse(readFileSync(stateFile, "utf8"));
     const include = loadPaths(join(HUB, ".harness/upstream-paths"));
     const head = gitText(up, "rev-parse", "HEAD");
@@ -482,7 +458,7 @@ function upstream() {
         git(up, "clean", "-fdq", "--", PREFIX);
         return [`seungness 훅 동기화 중단: seungness 커밋 실패(pre-commit 테스트 등): ${committed.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`];
       }
-      notes.push(pushMain(up) ? `seungness로 훅·등록 파일 ${files.length}개 올림` : `seungness 훅 push 실패: 커밋이 seungness 로컬에만 있음`);
+      notes.push(`seungness로 훅·등록 파일 ${files.length}개 올림 준비`);
       synced = gitText(up, "rev-parse", "HEAD");
     }
     apply(toHub);
@@ -499,7 +475,6 @@ function upstream() {
       return [...notes, `seungness 훅 받기 커밋 실패(변경은 되돌림, 다음 동기화 때 다시 받음): ${committed.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`];
     }
     if (received.length) notes.push(`seungness에서 훅·등록 파일 ${received.length}개 받음`);
-    if (!pushMain(HUB)) notes.push("waveness push 실패: 훅 동기화 커밋이 waveness 로컬에만 있음");
     return notes;
   });
 }
@@ -514,21 +489,10 @@ function safeUpstream() {
   }
 }
 
-function auto(project, mode) {
-  if (!readLock(project)) return [];
-  // worktree 세션은 메인 체크아웃이 아니라 동기화하지 않음
-  if (resolve(project, gitText(project, "rev-parse", "--git-dir")) !== resolve(project, gitText(project, "rev-parse", "--git-common-dir")))
-    return [];
-  // seungness 훅을 먼저 waveness에 맞춰야 이번 받기에 함께 들어감
-  const upstreamNotes = safeUpstream();
-  return [...upstreamNotes, ...withLock(project, () => {
-    // 네트워크가 없으면 로컬 waveness 그대로 진행
-    if (hubReady()) gitOk(HUB, "pull", "-q", "--ff-only", "origin", "main");
-    return [
-      mode !== "push" && autoPull(project),
-      mode !== "pull" && autoPush(project),
-    ].filter(Boolean);
-  })];
+function auto(project) {
+  const result = spawnSync(process.execPath, [join(HUB, "bin/harness-automation.mjs"), "status", project], { encoding: "utf8", env: process.env });
+  if (result.stdout) process.stdout.write(result.stdout);
+  return [];
 }
 
 // 훅 결과 출력. SessionStart 훅(HARNESS_HOOK_JSON)에서는 문제를 systemMessage로 사용자 화면에도 띄움. 평문 stdout은 에이전트 맥락에만 들어감
@@ -543,8 +507,19 @@ function report(notes) {
 }
 
 const [command, target, mode = "both"] = process.argv.slice(2);
-if (command === "upstream") {
+if (command === "prepare-upstream") {
   report(safeUpstream());
+  process.exit(0);
+}
+if (command === "receive") {
+  const project = gitText(resolve(target), "rev-parse", "--show-toplevel");
+  const result = autoPull(project);
+  if (result) console.log(result);
+  process.exit(/보류|실패/.test(result ?? "") ? 1 : 0);
+}
+if (command === "upstream") {
+  const result = spawnSync(process.execPath, [join(HUB, "bin/harness-automation.mjs"), "status-hubs"], { encoding: "utf8", env: process.env });
+  if (result.stdout) process.stdout.write(result.stdout);
   process.exit(0);
 }
 if (!["pull", "push", "auto"].includes(command) || !target || !["pull", "push", "both"].includes(mode)) {

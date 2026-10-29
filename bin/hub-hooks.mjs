@@ -20,8 +20,14 @@ export function hubConfig(file) {
   const hooks = {};
   for (const [event, groups] of Object.entries(readJson(join(ROOT, file)).hooks ?? {})) {
     const own = groups.filter((g) => g.hooks.every((h) => h.command.includes(`${dir}/bin/`)));
-    if (own.length) hooks[event] = own;
+    const kept = own.map((group) => ({ ...group, hooks: group.hooks.filter((hook) =>
+      !/bin\/harness(?:-automation)?\.mjs.* (?:upstream|status-hubs)$/.test(hook.command),
+    ) })).filter((group) => group.hooks.length);
+    if (kept.length) hooks[event] = kept;
   }
+  (hooks.SessionStart ??= []).unshift({ matcher: "startup", hooks: [{
+    type: "command", command: `HARNESS_HOOK_JSON=1 node "${dir}/bin/harness-automation.mjs" status-hubs`,
+  }] });
   for (const [event, groups] of Object.entries(harnessHooks)) {
     for (const group of groups) {
       const list = group.hooks
