@@ -58,6 +58,7 @@ waveness와 프로젝트를 같은 폴더에 둔다. 다른 위치면 `HARNESS_H
 - Actions secret `HARNESS_SYNC_TOKEN`: 허브·seungness에 접근하는 개인 계정 인증. `HARNESS_PROJECT_TOKEN`: 회사 프로젝트에 접근하는 별도 회사 계정 인증. 저장소 contents·pull requests·워크플로 등록 권한이 필요하다. 값은 코드·로그·Git URL에 저장하지 않는다.
 - 기존 GitHub CLI 로그인으로 로컬 실행할 수 있다. `projectAccount`는 회사 프로젝트를 조회할 로컬 계정 이름이며 Actions에서는 secret이 우선한다.
 - PR 작성에 기본 `GITHUB_TOKEN`을 사용하지 않으므로 생성된 PR의 CI도 일반 PR처럼 실행된다. 인증 만료·권한 부족은 Actions 실패로 표시된다.
+- 개인 프로젝트는 Vercel 연동 여부와 관계없이 검사 통과 후 자동 병합한다. 회사 프로젝트는 `companyVercelManualMerge` 정책이 켜져 있으면 Vercel 상태·검사 또는 로컬 연결 설정을 확인해 사용자 수동 병합으로 제한한다. `manualMerge: true`로 지정한 프로젝트는 검사 결과와 관계없이 자동 병합하지 않는다. 신규 연결에도 같은 정책을 적용한다.
 - 자동화 전용 PR만 검사 후 병합한다. 사람 리뷰를 요구하는 기존 브랜치 보호를 우회하지 않으며, 그런 보호가 있으면 GitHub가 병합을 거절한다.
 - waveness↔seungness 훅 동기화도 PR을 거친다. seungness에 올릴 내용이 있으면 그 PR이 먼저 병합된 뒤 waveness의 기준점을 갱신한다.
 

@@ -85,7 +85,7 @@ test("필수 Actions 검사와 모든 최신 검사가 통과해야만 병합 �
 });
 
 test("자동 병합은 작성 계정·출처·base·변경 경로·검사를 확인하고 최신 PR SHA를 전달", () => {
-  for (const scenario of ["정상", "다른 작성자", "이전 출처", "이전 기준", "검사 없음", "검사 실패", "병합 커밋 검사 실패", "제품 변경", "제품 경로에서 이름 변경", "검사 중 기준 변경", "GitHub 거절"]) {
+  for (const scenario of ["정상", "회사 Vercel", "개인 Vercel", "다른 작성자", "이전 출처", "이전 기준", "검사 없음", "검사 실패", "병합 커밋 검사 실패", "제품 변경", "제품 경로에서 이름 변경", "검사 중 기준 변경", "GitHub 거절"]) {
     const merged = [];
     let refs = 0;
     const pr = {
@@ -106,13 +106,13 @@ test("자동 병합은 작성 계정·출처·base·변경 경로·검사를 확
       if (path.includes("git/ref/")) return JSON.stringify({ object: { sha: scenario === "검사 중 기준 변경" && refs++ > 0 ? "other-base" : "base" } });
       if (path.includes("/files?")) return JSON.stringify([[{ filename: scenario === "제품 변경" ? "src/app.ts" : ".harness/sync.sh", ...(scenario === "제품 경로에서 이름 변경" && { previous_filename: "src/app.ts" }) }]]);
       if (path.includes("/check-runs?")) return JSON.stringify([{ check_runs: scenario === "검사 없음" ? [] : [{ id: path.includes("merge-head") ? 1 : 2, app: { id: 1, slug: "github-actions" }, name: "하네스 검사", status: "completed", conclusion: scenario === "검사 실패" || path.includes("merge-head") ? "failure" : "success" }] }]);
-      if (path.includes("/statuses?")) return '[[]]';
+      if (path.includes("/statuses?")) return scenario.endsWith("Vercel") ? '[[{"context":"Vercel","state":"success"}]]' : '[[]]';
       throw new Error(path);
     };
-    const run = () => mergeReady("test/project", "develop", (path) => path.startsWith(".harness/"), "source", call);
+    const run = () => mergeReady("test/project", "develop", (path) => path.startsWith(".harness/"), "source", call, scenario === "회사 Vercel");
     if (scenario === "GitHub 거절") assert.throws(run, /병합 거절/);
     else run();
-    assert.equal(merged.length, ["정상", "GitHub 거절"].includes(scenario) ? 1 : 0, scenario);
+    assert.equal(merged.length, ["정상", "개인 Vercel", "GitHub 거절"].includes(scenario) ? 1 : 0, scenario);
     if (merged.length) assert.ok(merged[0].includes("sha=latest-head"));
   }
 });

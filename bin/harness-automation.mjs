@@ -77,7 +77,11 @@ export function register(project, branch, request = api, hubRoot = ROOT) {
   if (existsSync(workflow) && readFileSync(workflow, "utf8") !== source)
     throw new Error("기존 하네스 검사 워크플로 내용 검토 필요");
   // 모든 사전 검사 후에만 등록 파일·워크플로·명시적 통합 브랜치를 함께 반영
-  if (!config.projects.some((entry) => entry.repo === repo)) config.projects.push({ repo, branch });
+  if (!config.projects.some((entry) => entry.repo === repo)) {
+    const company = config.companyVercelManualMerge && !repo.startsWith(`${config.hub.split("/")[0]}/`);
+    const vercel = ["vercel.json", ".vercel/project.json"].some((file) => existsSync(join(project, file)));
+    config.projects.push({ repo, branch, ...(company && vercel && { manualMerge: true }) });
+  }
   mkdirSync(dirname(workflow), { recursive: true });
   writeFileSync(workflow, source);
   writeFileSync(lockFile, `${JSON.stringify({ ...lock, branch }, null, 2)}\n`);
@@ -88,7 +92,7 @@ export function register(project, branch, request = api, hubRoot = ROOT) {
 export function verifyConnection(project, request = api, hubRoot = ROOT) {
   const config = json(join(hubRoot, ".harness/projects.json"));
   const repo = repository(git(project, "remote", "get-url", "origin"));
-  const branch = json(join(project, ".harness/lock.json")).branch;
+  const branch = json(join(project, ".harness/lock.json")).branch ?? config.projects.find((entry) => entry.repo === repo)?.branch;
   const read = (target, path) => Buffer.from(request(target, path).content, "base64").toString();
   const registered = JSON.parse(read(config.hub, "contents/.harness/projects.json?ref=main")).projects;
   if (!branch || !registered.some((entry) => entry.repo === repo && entry.branch === branch))
@@ -121,7 +125,11 @@ export function status(project, request = api) {
   if (lock.synced === head) return [];
   const prs = request(repo, "pulls?state=open&per_page=100").filter((pr) => pr.body?.includes(MARKER) && pr.head.ref.startsWith("harness/sync/"));
   const pr = prs.find((item) => item.base.ref === lock.branch) ?? prs[0];
-  if (pr) return [`[하네스] ${hub} 업데이트 있음\n자동 업데이트 PR: ${pr.html_url}\n상태: 검사·병합 대기 (실패·충돌 시 해당 PR 확인)`];
+  if (pr) {
+    const configFile = join(ROOT, ".harness/projects.json");
+    const manual = existsSync(configFile) && json(configFile).projects.some((entry) => entry.repo === repo && entry.manualMerge);
+    return [`[하네스] ${hub} 업데이트 있음\n자동 업데이트 PR: ${pr.html_url}\n상태: ${manual ? "검사 후 사용자 수동 병합" : "검사·병합 대기"} (실패·충돌 시 해당 PR 확인)`];
+  }
   const branch = lock.branch ?? ["develop", "main", "master"].find((name) => {
     try { git(project, "rev-parse", "--verify", `refs/heads/${name}`); return true; } catch { return false; }
   });
@@ -212,7 +220,7 @@ function publish(repo, base, path, key, source, allowed) {
     gh(repo, "pr", "close", String(pr.number), "--repo", repo);
 }
 
-export function mergeReady(repo, base, allowed, source, call = gh) {
+export function mergeReady(repo, base, allowed, source, call = gh, restrictVercel = false) {
   const request = (path) => JSON.parse(call(repo, "api", `repos/${repo}/${path}`));
   const prs = request(`pulls?state=open&base=${encodeURIComponent(base)}&per_page=100`);
   for (const item of prs) {
@@ -238,6 +246,11 @@ export function mergeReady(repo, base, allowed, source, call = gh) {
       results.push({ runs, statuses });
     }
     const selected = results.findLast((result) => result.runs.length || result.statuses.length) ?? results[0];
+    if (restrictVercel && results.some((result) => result.statuses.some((status) => /vercel/i.test(status.context)) ||
+      result.runs.some((run) => /vercel/i.test(`${run.name} ${run.app?.slug ?? ""}`)))) {
+      console.log(`${repo}#${pr.number}: 회사 Vercel 연동 프로젝트는 검사 후 사용자 수동 병합`);
+      continue;
+    }
     if (!results.every((result) => checksPassed(result.runs, result.statuses, false)) || !checksPassed(selected.runs, selected.statuses)) continue;
     if (request(`git/ref/heads/${base}`).object.sha !== baseSha) continue;
     const result = JSON.parse(call(repo, "api", "--method", "PUT", `repos/${repo}/pulls/${pr.number}/merge`,
@@ -273,7 +286,9 @@ export function coordinate() {
       const originalPaths = readFileSync(join(project, ".harness/paths"), "utf8");
       const allowed = (path) => path === VERIFY || path === ".harness/lock.json" ||
         (pathMatcher(readFileSync(join(hub, "harness/.harness/paths"), "utf8"))(path) && pathMatcher(originalPaths)(path));
-      mergeReady(target.repo, target.branch, allowed, git(hub, "rev-parse", "HEAD"));
+      const company = config.companyVercelManualMerge && !target.repo.startsWith(`${config.hub.split("/")[0]}/`);
+      if (!(target.manualMerge || (company && existsSync(join(project, "vercel.json")))))
+        mergeReady(target.repo, target.branch, allowed, git(hub, "rev-parse", "HEAD"), gh, Boolean(company));
       // 병합으로 base가 바뀐 경우 이번 체크아웃은 버리고 다음 실행에서 최신 base 사용
       if (api(target.repo, `git/ref/heads/${target.branch}`).object.sha !== git(project, "rev-parse", "HEAD")) continue;
       const source = git(hub, "rev-parse", "HEAD");
