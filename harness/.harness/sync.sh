@@ -11,6 +11,20 @@ if [ ! -f "$hub/bin/harness.mjs" ]; then
   exit 0
 fi
 
+# GUI 훅의 PATH에 Homebrew 경로가 빠진 경우만 보정, 자식 커밋 훅에도 전달
+if ! command -v node >/dev/null 2>&1; then
+  PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
+  export PATH
+fi
+if ! command -v node >/dev/null 2>&1; then
+  if [ "${1:-}" = session ]; then
+    echo '{"systemMessage":"공용 하네스 동기화 실패: node를 찾을 수 없습니다. Node.js 설치와 훅 PATH를 확인하세요."}'
+  else
+    echo "공용 하네스 동기화 실패: node를 찾을 수 없습니다. Node.js 설치와 훅 PATH를 확인하세요." >>"$(git rev-parse --git-common-dir)/harness-sync.log"
+  fi
+  exit 0
+fi
+
 case "${1:-}" in
   session) HARNESS_HOOK_JSON=1 node "$hub/bin/harness.mjs" auto "$root" both ;;
   commit)

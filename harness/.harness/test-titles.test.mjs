@@ -20,7 +20,7 @@ test("한글 제목은 허용하고 플러그인이 영문 설명과 동적 제�
       join(fixture, "biome.json"),
       JSON.stringify({
         plugins: ["./titles.grit"],
-        linter: { rules: { preset: "none" } },
+        linter: { rules: { recommended: false } },
         formatter: { enabled: false },
       }),
     );

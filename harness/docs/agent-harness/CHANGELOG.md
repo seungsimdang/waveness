@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-10-29 동기화 훅의 Node.js 실행 경로 보정
+
+- PATH에 node가 없으면 Homebrew 기본 경로를 추가하고 자식 커밋 훅에도 전달. 여전히 없으면 세션 화면 또는 동기화 로그에 실패 표시.
+- 기존 PATH 유지, 경로 보정, Node.js 부재의 회귀 검사 추가.
+- 받기를 막던 스캐폴딩 스킬의 명세 형식 등록 누락과 Biome 2.2에서 지원하지 않는 검사 설정 수정.
+
 ## 2026-10-28 chore(harness): 가능 여부 판정 훅 임시 파일 권한 제한
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@2b18642837af9a10812d906777c4b47f344f7154`

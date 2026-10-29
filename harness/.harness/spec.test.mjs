@@ -57,6 +57,7 @@ const ORCHESTRATOR_SECTIONS = ["목적", "실행 모드", "실행 모드 확인"
 const SKILL_SECTIONS = ["역할", "사용 조건", "입력", "절차", "출력", "품질 기준", "테스트 프롬프트"];
 // 외부 가이드와 별도 형식으로 작성된 스킬은 각자의 기존 계약을 검사
 const SKILL_CONTRACTS = {
+  "scaffold-web-project": ["입력 확인", "구성 순서", "완료 기준", "사용 예시"],
   "feature-team-orchestrator": ["목적", "전제 조건", "실행 모드", "실행 모드 확인", "Agent Team 구성", "Task 등록 계약", "Agent Team 실행 흐름", "도구 미연결 처리", "사람 승인 지점", "실패 처리"],
   "harness-lab": ["역할", "기본 원칙", "실행 모드", "품질 기준"],
   "itd-commit": ["Overview", "커밋 컨벤션", "Workflow", "규칙"],
