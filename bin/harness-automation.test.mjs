@@ -215,7 +215,7 @@ if(args[0]==='repo') git('clone','-q','--branch',args[6],root+'/'+args[2].split(
 else if(args[0]==='api') {
  const path=args.at(-1);
  if(path.includes('/pulls?')) console.log(readFileSync(state,'utf8'));
- else if(path.includes('/git/ref/heads/')) console.log(JSON.stringify({object:{sha:git('--git-dir',root+'/'+path.split('/')[2]+'.git','rev-parse',path.split('/').at(-1))}}));
+ else if(path.includes('/git/ref/heads/')) console.log(JSON.stringify({object:{sha:process.env.TEST_UPSTREAM_MOVED ? 'moved' : git('--git-dir',root+'/'+path.split('/')[2]+'.git','rev-parse',path.split('/').at(-1))}}));
  else if(path.includes('/pulls/')) console.log(JSON.stringify({...JSON.parse(readFileSync(state))[0],mergeable:false}));
  else if(path==='user') console.log('{"login":"test","id":7,"name":"검사 계정"}');
  else throw Error('예상하지 않은 API '+path);
@@ -225,8 +225,8 @@ else if(args[0]==='api') {
  console.log('https://github.com/test/project/pull/1');
 }
 `, { mode: 0o755 });
-    const run = () => spawnSync(process.execPath, [join(hub, "bin/harness-automation.mjs"), "run"], {
-      cwd: hub, encoding: "utf8", env: { ...process.env, PATH: `${stub}:${process.env.PATH}`, TEST_TEMP: temp },
+    const run = (env = {}) => spawnSync(process.execPath, [join(hub, "bin/harness-automation.mjs"), "run"], {
+      cwd: hub, encoding: "utf8", env: { ...process.env, PATH: `${stub}:${process.env.PATH}`, TEST_TEMP: temp, ...env },
     });
     const first = run();
     assert.equal(first.status, 0, first.stderr);
@@ -239,5 +239,14 @@ else if(args[0]==='api') {
     assert.equal(second.status, 0, second.stderr);
     assert.equal(JSON.parse(readFileSync(state)).length, 1);
     assert.doesNotMatch(second.stdout, /pull\/1/);
+    writeFileSync(join(hub, ".harness/projects.json"), JSON.stringify({ hub: "test/hub", upstream: "test/hub", projects: [{ repo: "test/missing", branch: "develop" }] }));
+    const failed = run({ TEST_UPSTREAM_MOVED: "1" });
+    assert.equal(failed.status, 1, failed.stderr);
+    assert.match(failed.stderr, /동기화 실패: test\/missing/);
+    assert.doesNotMatch(failed.stderr, /허브 간 동기화 중단/);
+    writeFileSync(join(hub, ".harness/projects.json"), JSON.stringify({ hub: "test/hub", upstream: "test/hub", projects: [] }));
+    const moved = run({ TEST_UPSTREAM_MOVED: "1" });
+    assert.equal(moved.status, 0, moved.stderr);
+    assert.doesNotMatch(moved.stdout, /pull\/1/);
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });

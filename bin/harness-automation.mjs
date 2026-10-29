@@ -342,16 +342,17 @@ export function coordinate() {
       const allowed = (path) => hubAllowed(path) || path === ".harness/upstream.json";
       mergeReady(config.hub, "main", allowed);
       mergeReady(config.upstream, "main", hubAllowed);
-      if (api(config.hub, "git/ref/heads/main").object.sha !== git(hub, "rev-parse", "HEAD") || api(config.upstream, "git/ref/heads/main").object.sha !== git(up, "rev-parse", "HEAD")) return;
-      const hubHead = git(hub, "rev-parse", "HEAD");
-      const upHead = git(up, "rev-parse", "HEAD");
-      prepare(hub, "prepare-upstream", up, { UPSTREAM_HUB: up });
-      regenerate(hub);
-      regenerate(up);
-      if (git(up, "rev-parse", "HEAD") !== upHead)
-        publish(config.upstream, "main", up, "from-waveness", hubHead, hubAllowed);
-      // upstream PR 병합 전의 커밋을 waveness lock 기준으로 사용하지 않음
-      else publish(config.hub, "main", hub, "from-seungness", upHead, allowed);
+      if (api(config.hub, "git/ref/heads/main").object.sha === git(hub, "rev-parse", "HEAD") && api(config.upstream, "git/ref/heads/main").object.sha === git(up, "rev-parse", "HEAD")) {
+        const hubHead = git(hub, "rev-parse", "HEAD");
+        const upHead = git(up, "rev-parse", "HEAD");
+        prepare(hub, "prepare-upstream", up, { UPSTREAM_HUB: up });
+        regenerate(hub);
+        regenerate(up);
+        if (git(up, "rev-parse", "HEAD") !== upHead)
+          publish(config.upstream, "main", up, "from-waveness", hubHead, hubAllowed);
+        // upstream PR 병합 전의 커밋을 waveness lock 기준으로 사용하지 않음
+        else publish(config.hub, "main", hub, "from-seungness", upHead, allowed);
+      }
     } catch { errors.push(config.upstream); console.error("허브 간 동기화 중단: Actions 로그와 로컬 prepare-upstream 결과 확인"); }
     finally { rmSync(temp, { recursive: true, force: true }); }
   }
