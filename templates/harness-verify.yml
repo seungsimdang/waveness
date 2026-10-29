@@ -13,6 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -35,15 +36,7 @@ jobs:
       - name: 공용 하네스와 프로젝트 계약 검사
         env:
           HUSKY: '0'
+          HARNESS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          node --test .harness/*.test.mjs
-          node --input-type=module <<'JS'
-          import { existsSync, readFileSync } from 'node:fs';
-          import { execFileSync } from 'node:child_process';
-          if (existsSync('package.json')) {
-            const scripts = JSON.parse(readFileSync('package.json')).scripts ?? {};
-            const pm = existsSync('pnpm-lock.yaml') ? 'pnpm' : 'npm';
-            for (const name of ['harness:test', ['type-check', 'typecheck'].find(k => scripts[k]), ['check', 'lint'].find(k => scripts[k])].filter(k => k && scripts[k]))
-              execFileSync(pm, ['run', name], { stdio: 'inherit' });
-          }
-          JS
+          if [ -z "$HARNESS_BASE_SHA" ]; then export HARNESS_BASE_SHA="$(git rev-parse HEAD^)"; fi
+          node .harness/pre-commit.mjs --ci

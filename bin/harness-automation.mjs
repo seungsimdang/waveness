@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { hook, installChecks } from "../harness/.harness/install-checks.mjs";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MARKER = "<!-- harness-automation:v1 -->";
 const VERIFY = ".github/workflows/harness-verify.yml";
@@ -76,6 +78,7 @@ export function register(project, branch, request = api, hubRoot = ROOT) {
   const source = readFileSync(join(hubRoot, "templates/harness-verify.yml"), "utf8");
   if (existsSync(workflow) && readFileSync(workflow, "utf8") !== source)
     throw new Error("기존 하네스 검사 워크플로 내용 검토 필요");
+  if (existsSync(join(project, "package.json"))) installChecks(project, { activate: true });
   // 모든 사전 검사 후에만 등록 파일·워크플로·명시적 통합 브랜치를 함께 반영
   if (!config.projects.some((entry) => entry.repo === repo)) {
     const company = config.companyVercelManualMerge && !repo.startsWith(`${config.hub.split("/")[0]}/`);
@@ -99,6 +102,14 @@ export function verifyConnection(project, request = api, hubRoot = ROOT) {
     throw new Error("허브 origin/main에 프로젝트·통합 브랜치 등록 미반영");
   if (read(repo, `contents/${VERIFY}?ref=${encodeURIComponent(branch)}`) !== readFileSync(join(hubRoot, "templates/harness-verify.yml"), "utf8"))
     throw new Error("프로젝트 원격 통합 브랜치에 검사 워크플로 미반영");
+  if (existsSync(join(project, "package.json"))) {
+    if (read(repo, `contents/.husky/pre-commit?ref=${encodeURIComponent(branch)}`) !== hook)
+      throw new Error("원격 통합 브랜치에 공용 pre-commit 진입점 미반영");
+    if (git(project, "config", "--get", "core.hooksPath") !== ".husky/_" || !existsSync(join(project, ".husky/_/pre-commit")))
+      throw new Error("로컬 Husky 미활성화: node .harness/install-checks.mjs --activate 필요");
+    const checks = JSON.parse(read(repo, `contents/.harness/checks.json?ref=${encodeURIComponent(branch)}`));
+    if (!checks.lint?.length || !checks.typecheck?.length) throw new Error("원격 공용 검사 설정 미반영");
+  }
   return `${repo}: 서버 자동 PR·검사·병합 연결 등록 확인`;
 }
 
@@ -283,6 +294,8 @@ export function coordinate() {
       clone(target.repo, target.branch, project);
       const lock = json(join(project, ".harness/lock.json"));
       if (lock.branch && lock.branch !== target.branch) throw new Error("등록과 lock의 통합 브랜치 불일치");
+      if (!existsSync(join(project, ".harness/checks.json")))
+        throw new Error("공용 커밋 검사 마이그레이션 필요: 프로젝트 검사 설정·훅·paths 검토 후 반영");
       const originalPaths = readFileSync(join(project, ".harness/paths"), "utf8");
       const allowed = (path) => path === VERIFY || path === ".harness/lock.json" ||
         (pathMatcher(readFileSync(join(hub, "harness/.harness/paths"), "utf8"))(path) && pathMatcher(originalPaths)(path));

@@ -1,3 +1,8 @@
 #!/bin/sh
-# 동기화 도구·판정 훅·Claude·Codex 짝 일치 테스트가 실패하면 커밋 차단
-node --test bin/*.test.mjs harness/.harness/*.test.mjs >/dev/null 2>&1 || { echo "pre-commit 차단: node --test bin/*.test.mjs harness/.harness/*.test.mjs 실패" >&2; exit 1; }
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+if ! command -v node >/dev/null 2>&1; then
+  PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
+  export PATH
+fi
+exec node harness/.harness/pre-commit.mjs

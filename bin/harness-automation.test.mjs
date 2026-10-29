@@ -182,7 +182,8 @@ test("격리 PR 전달은 원격 main을 바꾸지 않고 반복 실행에서 PR
     init(hub);
     for (const path of ["bin", "templates"]) cpSync(join(ROOT, path), join(hub, path), { recursive: true });
     mkdirSync(join(hub, "harness/.harness"), { recursive: true });
-    writeFileSync(join(hub, "harness/.harness/paths"), "AGENTS.md\n.harness/\n!.harness/lock.json\n");
+    cpSync(join(ROOT, "harness/.harness/install-checks.mjs"), join(hub, "harness/.harness/install-checks.mjs"));
+    writeFileSync(join(hub, "harness/.harness/paths"), "AGENTS.md\n.harness/\n!.harness/lock.json\n!.harness/checks.json\n");
     writeFileSync(join(hub, "harness/AGENTS.md"), "공용 규칙\n");
     writeFileSync(join(hub, "bin/hub-hooks.mjs"), "// 픽스처에 루트 훅 등록 없음\n");
     commit(hub);
@@ -194,6 +195,7 @@ test("격리 PR 전달은 원격 main을 바꾸지 않고 반복 실행에서 PR
     writeFileSync(join(project, ".harness/lock.json"), JSON.stringify({ name: "project", synced: source, branch: "develop" }));
     mkdirSync(join(project, "docs/agent-rules"), { recursive: true });
     writeFileSync(join(project, "docs/agent-rules/project.md"), "프로젝트 소유 규칙\n");
+    writeFileSync(join(project, ".harness/checks.json"), "{}\n");
     writeFileSync(join(project, "product.txt"), "제품\n");
     commit(project);
     const original = git(project, "rev-parse", "HEAD");

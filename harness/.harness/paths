@@ -9,6 +9,7 @@ CLAUDE.md
 .claude/skills/
 .codex/
 .harness/
+.husky/pre-commit
 artifacts/README.md
 artifacts/feature-team/README.md
 artifacts/work/README.md
@@ -19,3 +20,4 @@ docs/agent-rules/
 !docs/agent-rules/project.md
 !docs/agent-harness/CHANGELOG.md
 !.harness/lock.json
+!.harness/checks.json

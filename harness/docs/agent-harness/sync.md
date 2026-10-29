@@ -101,3 +101,17 @@ waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.
 한글 테스트 제목의 Biome 플러그인은 `.harness/korean-test-titles.grit`로 배포한다. Biome를 사용하는 프로젝트는 설정의 `plugins`에 `./.harness/korean-test-titles.grit`를 등록한다. 회귀 테스트는 해당 프로젝트의 `node_modules/.bin/biome`로 실행하며 Biome가 없으면 사유를 표시하고 건너뛴다. 공용화 과정에서 프로젝트의 패키지나 린트 설정을 덮어쓰지 않는다.
 
 소스·문서 검사기는 `.harness/check-*.sh`와 `.harness/check-comment-line-breaks.mjs`로 배포한다. 주석 훅은 프로젝트 `scripts/` 검사기를 우선하고, 없으면 공용 검사기를 사용한다. Git 인덱스 검사기의 lint-staged 연결 여부는 프로젝트가 정한다. 작성자 강제·프로젝트 병합 정책·React Doctor·Tailwind·admin 및 UI 컴포넌트 검사는 프로젝트 소유로 유지한다.
+
+
+## 공용 pre-commit·CI 계약
+
+2026-10-29: 프로젝트마다 누락되거나 다른 Git 검사 진입점을 공용 검사기로 통일.
+
+- `.husky/pre-commit`은 `.harness/pre-commit.mjs` 하나를 호출하며 두 경로를 함께 동기화한다. 프로젝트의 `prepare: husky`가 새 체크아웃에서 Git 훅을 활성화한다.
+- 프로젝트별 명령은 `.harness/checks.json`에 둔다. 이 파일은 프로젝트 소유로 제외하며 공용 업데이트가 덮어쓰지 않는다. `lint`·`typecheck`는 필수 명령 배열이다. `extra`는 `{ "command": ["pnpm", "run", "knip"] }` 형식으로 기존 추가 검사를 순서대로 보존한다. lint-staged·React Doctor처럼 스테이징이 필요한 항목에만 `"staged": true`를 지정한다. 일반 검사·테스트에는 Git 저장소 선택 환경을 전달하지 않는다.
+- `lint`에는 Biome `--error-on-warnings` 또는 ESLint `--max-warnings 0`을 명시한다. 도구·설정·필수 명령이 없거나 하나라도 실패하면 중단한다. 경고를 허용하는 기존 package script를 대신 실행하지 않는다.
+- `identity: { "name": "...", "email": "..." }`는 로컬 커밋에서 Git 설정과 실제 author ident를 확인한다. CI의 서비스 계정에는 이 로컬 제한을 적용하지 않으며 자동 PR의 작성자·출처 검증은 기존 서버 병합 조건을 유지한다.
+- 로컬은 현재 스테이징을 사용한다. CI는 `HARNESS_BASE_SHA`를 기준으로 임시 Git HEAD·인덱스를 만들고 같은 검사기를 `--ci`로 실행한다. 스테이징 기반 추가 검사도 실제 PR 변경을 검사하며 검사 도중 작업 파일을 수정하면 실패한다. 원래 저장소의 HEAD·인덱스는 변경하지 않는다.
+- 새 연결은 `register`에서 공용 훅·기본 설정을 준비한다. 기존 pre-commit이 다르면 자동 덮어쓰지 않고 중단한다. 기존 검사를 설정으로 옮겨 검토한 후에만 `node .harness/install-checks.mjs --replace-reviewed-hook --activate`로 전환한다. 설치 후 `verify-connection`은 원격 훅·검사 설정도 확인한다.
+- 허브는 `.githooks/pre-commit`과 Actions에서 `node harness/.harness/pre-commit.mjs`를 호출한다. package.json이 없는 허브는 프로젝트 앱 검사의 대상이 아니며 기존 `bin/*.test.mjs`·공용 하네스 테스트 전체를 실행한다.
+- 세션 시작은 업데이트 안내만 수행한다. 검사 실패는 PR 병합을 차단하며 기존 회사 프로젝트의 수동 병합 정책을 바꾸지 않는다.
