@@ -86,9 +86,26 @@ function readWorking(file) {
 const same = (a, b) => (a && b ? a.mode === b.mode && a.data.equals(b.data) : !a && !b);
 
 // ours(작업 트리 파일)에 base→theirs 변경을 반영할 계획을 만듦. 파일은 apply에서만 씀
-function plan(file, base, theirs) {
-  if (same(base, theirs)) return null;
+function plan(file, base, theirs, preserveModels = false) {
   const ours = readWorking(file);
+  if (preserveModels && ours && theirs && /\/(?:\.codex|\.claude)\/agents\/[^/]+\.(?:toml|md)$/.test(file)) {
+    const codex = file.endsWith(".toml");
+    const split = (data) => {
+      const text = data.toString();
+      const end = codex ? text.indexOf('developer_instructions = """') : text.indexOf("\n---", 4);
+      return end < 0 ? [text, ""] : [text.slice(0, end), text.slice(end)];
+    };
+    const pattern = codex ? /^(model(?:_reasoning_effort)?)\s*=.*$/gm : /^(model|effort):.*$/gm;
+    const values = new Map([...split(ours.data)[0].matchAll(pattern)].map(([line, key]) => [key, line]));
+    const keep = (entry) => {
+      if (!entry) return entry;
+      const [header, body] = split(entry.data);
+      return { ...entry, data: Buffer.from(header.replace(pattern, (line, key) => values.get(key) ?? line) + body) };
+    };
+    base = keep(base);
+    theirs = keep(theirs);
+  }
+  if (same(base, theirs)) return null;
   if (!theirs) {
     if (!ours) return null;
     return same(ours, base) ? { file, remove: true } : { file, conflict: "원본에서 삭제됐지만 이쪽에서 수정됨" };
@@ -160,6 +177,7 @@ function planPull(project) {
         join(project, path),
         lock.synced ? blob(HUB, base, PREFIX + path) : null,
         blob(HUB, head, PREFIX + path),
+        process.env.HARNESS_PRESERVE_PROJECT_MODELS === "1",
       ),
     )
     .filter(Boolean);

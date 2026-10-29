@@ -164,13 +164,14 @@ const report = (notes) => {
 function clone(repo, branch, path) {
   if (!REPO.test(repo)) throw new Error("저장소 이름 형식 오류");
   gh(repo, "repo", "clone", repo, path, "--", "--branch", branch, "--no-single-branch");
-  git(path, "config", "user.name", "harness-sync");
-  git(path, "config", "user.email", "harness-sync@users.noreply.github.com");
+  const author = JSON.parse(gh(repo, "api", "user"));
+  git(path, "config", "user.name", author.name || author.login);
+  git(path, "config", "user.email", `${author.id}+${author.login}@users.noreply.github.com`);
 }
 
 // 준비 중인 프로젝트 코드는 인증 정보 없이 실행, 실제 검사는 PR의 읽기 전용 CI에서 수행
 function prepare(hub, command, project, extra = {}) {
-  const env = { ...process.env, ...extra };
+  const env = { ...process.env, ...extra, ...(command === "pull" && { HARNESS_PRESERVE_PROJECT_MODELS: "1" }) };
   for (const key of Object.keys(env)) if (/TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key)) delete env[key];
   const result = spawnSync(process.execPath, [join(hub, "bin/harness.mjs"), command, project], {
     cwd: hub, env, encoding: "utf8", maxBuffer: 1 << 24,

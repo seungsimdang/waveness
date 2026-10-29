@@ -7,6 +7,9 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { checksPassed, mergeReady, pathMatcher, register, repository, status, verifyConnection } from "./harness-automation.mjs";
 
+// 실제 pre-commit의 작성자·인덱스 환경이 임시 원격 검사의 작성자를 덮어쓰지 않도록 격리
+for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
 const init = (path, branch = "main") => {
@@ -212,7 +215,7 @@ else if(args[0]==='api') {
  if(path.includes('/pulls?')) console.log(readFileSync(state,'utf8'));
  else if(path.includes('/git/ref/heads/')) console.log(JSON.stringify({object:{sha:git('--git-dir',root+'/'+path.split('/')[2]+'.git','rev-parse',path.split('/').at(-1))}}));
  else if(path.includes('/pulls/')) console.log(JSON.stringify({...JSON.parse(readFileSync(state))[0],mergeable:false}));
- else if(path==='user') console.log('{"login":"test"}');
+ else if(path==='user') console.log('{"login":"test","id":7,"name":"검사 계정"}');
  else throw Error('예상하지 않은 API '+path);
 } else if(args[0]==='pr' && args[1]==='create') {
  const get=k=>args[args.indexOf(k)+1];
@@ -226,6 +229,8 @@ else if(args[0]==='api') {
     const first = run();
     assert.equal(first.status, 0, first.stderr);
     assert.match(first.stdout, /pull\/1/);
+    const published = JSON.parse(readFileSync(state))[0].head.ref;
+    assert.equal(git(temp, "--git-dir", join(temp, "project.git"), "log", "-1", "--format=%ae", published), "7+test@users.noreply.github.com");
     assert.equal(git(temp, "--git-dir", join(temp, "project.git"), "rev-parse", "develop"), original);
     assert.equal(git(project, "status", "--porcelain"), "");
     const second = run();

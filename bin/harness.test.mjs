@@ -271,6 +271,33 @@ test("수동 반영 재시도는 이력을 중복하지 않고 실제 변경 없
   }
 });
 
+test("자동 PR 받기는 기존 모델·effort를 반복 업데이트에서도 보존하고 역할 본문은 갱신", () => {
+  const { root, hub, project } = setup();
+  try {
+    const codex = ".codex/agents/model-fixture.toml";
+    const claude = ".claude/agents/model-fixture.md";
+    const role = (model, effort, body) => `model = "${model}"\nmodel_reasoning_effort = "${effort}"\ndeveloper_instructions = """\nmodel = "${body}"\n"""\n`;
+    const agent = (model, effort, body) => `---\nmodel: ${model}\neffort: ${effort}\n---\nmodel: ${body}\n`;
+    writeFileSync(join(hub, "harness", codex), role("project-model", "medium", "원래 본문"));
+    writeFileSync(join(hub, "harness", claude), agent("project-model", "medium", "원래 본문"));
+    git(hub, "add", "."); commit(hub, "test: 기존 모델");
+    run(hub, "pull", project);
+    git(project, "add", "."); commit(project, "test: 연결", "Harness-Scope: sync");
+    for (const body of ["첫 업데이트", "둘째 업데이트"]) {
+      writeFileSync(join(hub, "harness", codex), role(`hub-${body}`, "high", body));
+      writeFileSync(join(hub, "harness", claude), agent(`hub-${body}`, "high", body));
+      git(hub, "add", "."); commit(hub, "test: 공용 변경");
+      const result = spawnSync(process.execPath, [join(hub, "bin/harness.mjs"), "pull", project], {
+        env: { ...ENV, HARNESS_PRESERVE_PROJECT_MODELS: "1" }, encoding: "utf8",
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(read(project, codex), role("project-model", "medium", body));
+      assert.equal(read(project, claude), agent("project-model", "medium", body));
+      git(project, "add", "."); commit(project, "test: 받기", "Harness-Scope: sync");
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("check-scope.sh는 분류 줄 누락과 generic 커밋의 대상 밖 파일을 막음", () => {
   const { root, hub, project } = setup();
   try {
