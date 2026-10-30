@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { checksPassed, mergeReady, pathMatcher, register, repository, status, verifyConnection } from "./harness-automation.mjs";
+import { checksPassed, cleanupBranches, deleteBranch, mergeReady, pathMatcher, register, repository, status, verifyConnection } from "./harness-automation.mjs";
 
 // 실제 pre-commit의 작성자·인덱스 환경이 임시 원격 검사의 작성자를 덮어쓰지 않도록 격리
 for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
@@ -84,9 +84,105 @@ test("필수 Actions 검사와 모든 최신 검사가 통과해야만 병합 �
   assert.equal(checksPassed([check, { ...check, id: 2, name: "선택 검사", conclusion: "skipped" }], []), true);
 });
 
+test("닫히거나 병합된 자동화 PR은 같은 계정·저장소·SHA이고 대체 열린 PR이 없을 때만 ref를 삭제", () => {
+  for (const scenario of ["대체로 닫힘", "자동 병합", "열린 PR", "열린 대상 PR", "외부 저장소", "다른 작성자", "새 SHA", "이미 삭제", "삭제 경합", "삭제 실패", "표식 없음", "범위 밖 ref"]) {
+    const branch = "harness/sync/receive/base-source-tree";
+    const merged = scenario === "자동 병합";
+    const pr = {
+      number: 7, body: scenario === "표식 없음" ? "" : "<!-- harness-automation:v1 -->", user: { login: scenario === "다른 작성자" ? "other" : "bot" },
+      head: { ref: scenario === "범위 밖 ref" ? "release/base-source-tree" : branch, sha: "head-sha", repo: { full_name: scenario === "외부 저장소" ? "fork/project" : "test/project" } },
+    };
+    const latest = { ...pr, state: scenario === "열린 대상 PR" ? "open" : "closed", merged };
+    let refs = 0;
+    const calls = [];
+    const pushed = [];
+    const call = (_repo, ...args) => {
+      const path = args.at(-1);
+      calls.push(path);
+      if (path === "user") return JSON.stringify({ login: "bot" });
+      if (path === `repos/test/project/pulls/${pr.number}`) return JSON.stringify(latest);
+      if (path === "repos/test/project/pulls?state=open&per_page=100")
+        return JSON.stringify(scenario === "열린 PR" ? [[{ number: 8, head: pr.head }]] : [[]]);
+      if (path === `repos/test/project/git/ref/heads/${branch}`) {
+        if (scenario === "이미 삭제") throw new Error("HTTP 404: Not Found");
+        refs++;
+        return JSON.stringify({ object: { sha: scenario === "새 SHA" || (scenario === "삭제 경합" && refs > 1) ? "new-sha" : "head-sha" } });
+      }
+      throw new Error(`예상하지 않은 API ${path}`);
+    };
+    const push = (command, args) => {
+      pushed.push({ command, args });
+      return { status: scenario === "삭제 실패" || scenario === "삭제 경합" ? 1 : 0 };
+    };
+    const run = () => deleteBranch("test/project", pr, merged, "harness/sync/receive/", call, push);
+    if (scenario === "삭제 실패") assert.throws(run, /자동화 브랜치 삭제 실패/);
+    else assert.equal(run(), ["대체로 닫힘", "자동 병합"].includes(scenario), scenario);
+    assert.equal(pushed.length, ["대체로 닫힘", "자동 병합", "삭제 실패", "삭제 경합"].includes(scenario) ? 1 : 0, scenario);
+    if (pushed.length) {
+      assert.equal(pushed[0].command, "git");
+      assert.ok(pushed[0].args.includes("--force-with-lease=refs/heads/" + branch + ":head-sha"));
+      assert.ok(pushed[0].args.includes("https://github.com/test/project.git"));
+      assert.ok(pushed[0].args.includes(`:refs/heads/${branch}`));
+      assert.ok(pushed[0].args.includes("credential.helper=!gh auth git-credential"));
+    }
+    if (scenario === "외부 저장소") assert.equal(calls.length, 0);
+  }
+});
+
+test("수동 병합과 대체 PR이 생긴 종료 PR만 정리하고 실패한 정리는 다음 실행에서 재시도", () => {
+  const pr = (number, key, mergedAt = null) => ({
+    number, body: "<!-- harness-automation:v1 -->", merged_at: mergedAt, user: { login: "bot" },
+    head: { ref: `harness/sync/${key}/base-source-${number}`, repo: { full_name: "test/project" } },
+  });
+  const closed = [pr(1, "receive"), pr(3, "receive", "2026-10-30T00:00:00Z"), pr(7, "receive"),
+    pr(10, "receive"), pr(11, "receive", "2026-10-30T00:00:00Z")];
+  const open = [pr(2, "receive"), pr(8, "receive"), pr(9, "return-other", "2026-10-30T00:00:00Z")];
+  const call = (_repo, ...args) => {
+    const path = args.at(-1);
+    if (path === "repos/test/project/git/matching-refs/heads/harness/sync/")
+      return JSON.stringify([[...closed.filter((item) => item.number !== 11), ...open]
+        .map((item) => ({ ref: `refs/heads/${item.head.ref}` }))]);
+    if (path === "user") return JSON.stringify({ login: "bot" });
+    if (path === "repos/test/project/pulls?state=open&per_page=100") return JSON.stringify([open]);
+    if (path === "repos/test/project/pulls?state=closed&per_page=100") return JSON.stringify([closed]);
+    throw new Error(`예상하지 않은 API ${path}`);
+  };
+  const removed = [];
+  cleanupBranches("test/project", "harness/sync/", call, (...args) => removed.push(args));
+  assert.deepEqual(removed.map((args) => args[1].number), [1, 3, 7, 10]);
+  assert.ok(removed.every((args) => args[3] === "harness/sync/receive/"));
+  assert.ok(!removed.some((args) => args[1].number === 2));
+  const emptyCalls = [];
+  cleanupBranches("test/project", "harness/sync/", (_repo, ...args) => {
+    emptyCalls.push(args.at(-1));
+    return "[[]]";
+  }, () => assert.fail("ref 없는 저장소에서 삭제를 호출하지 않음"));
+  assert.deepEqual(emptyCalls, ["repos/test/project/git/matching-refs/heads/harness/sync/"]);
+
+  let attempts = 0;
+  const retryCall = (_repo, ...args) => {
+    const path = args.at(-1);
+    if (path === "repos/test/project/git/matching-refs/heads/harness/sync/")
+      return JSON.stringify([[{ ref: "refs/heads/harness/sync/receive/base-source-1" },
+        { ref: "refs/heads/harness/sync/receive/base-source-2" }]]);
+    if (path === "user") return JSON.stringify({ login: "bot" });
+    if (path === "repos/test/project/pulls?state=open&per_page=100") return JSON.stringify([[pr(2, "receive")]]);
+    if (path === "repos/test/project/pulls?state=closed&per_page=100") return JSON.stringify([[pr(1, "receive")]]);
+    throw new Error(`예상하지 않은 API ${path}`);
+  };
+  const retry = () => cleanupBranches("test/project", "harness/sync/", retryCall, () => {
+    attempts++;
+    if (attempts === 1) throw new Error("자동화 브랜치 삭제 실패");
+  });
+  assert.throws(retry, /삭제 실패/);
+  assert.doesNotThrow(retry);
+  assert.equal(attempts, 2);
+});
+
 test("자동 병합은 작성 계정·출처·base·변경 경로·검사를 확인하고 최신 PR SHA를 전달", () => {
   for (const scenario of ["정상", "회사 Vercel", "개인 Vercel", "다른 작성자", "이전 출처", "이전 기준", "검사 없음", "검사 실패", "병합 커밋 검사 실패", "제품 변경", "제품 경로에서 이름 변경", "검사 중 기준 변경", "GitHub 거절"]) {
     const merged = [];
+    const deleted = [];
     let refs = 0;
     const pr = {
       number: 1, body: `<!-- harness-automation:v1 -->\nSource: ${scenario === "이전 출처" ? "old" : "source"}\nBase: ${scenario === "이전 기준" ? "old" : "base"}\n`,
@@ -109,10 +205,13 @@ test("자동 병합은 작성 계정·출처·base·변경 경로·검사를 확
       if (path.includes("/statuses?")) return scenario.endsWith("Vercel") ? '[[{"context":"Vercel","state":"success"}]]' : '[[]]';
       throw new Error(path);
     };
-    const run = () => mergeReady("test/project", "develop", (path) => path.startsWith(".harness/"), "source", call, scenario === "회사 Vercel");
+    const run = () => mergeReady("test/project", "develop", (path) => path.startsWith(".harness/"), "source", call,
+      scenario === "회사 Vercel", (...args) => deleted.push(args));
     if (scenario === "GitHub 거절") assert.throws(run, /병합 거절/);
     else run();
     assert.equal(merged.length, ["정상", "개인 Vercel", "GitHub 거절"].includes(scenario) ? 1 : 0, scenario);
+    assert.equal(deleted.length, ["정상", "개인 Vercel"].includes(scenario) ? 1 : 0, scenario);
+    if (deleted.length) assert.deepEqual(deleted[0].slice(0, 4), ["test/project", pr, true, "harness/sync/"]);
     if (merged.length) assert.ok(merged[0].includes("sha=latest-head"));
   }
 });
@@ -214,7 +313,8 @@ const git=(...a)=>execFileSync('git',a,{encoding:'utf8'}).trim();
 if(args[0]==='repo') git('clone','-q','--branch',args[6],root+'/'+args[2].split('/')[1]+'.git',args[3]);
 else if(args[0]==='api') {
  const path=args.at(-1);
- if(path.includes('/pulls?')) console.log(readFileSync(state,'utf8'));
+ if(path.includes('/git/matching-refs/')) console.log('[[]]');
+ else if(path.includes('/pulls?')) console.log(readFileSync(state,'utf8'));
  else if(path.includes('/git/ref/heads/')) console.log(JSON.stringify({object:{sha:process.env.TEST_UPSTREAM_MOVED ? 'moved' : git('--git-dir',root+'/'+path.split('/')[2]+'.git','rev-parse',path.split('/').at(-1))}}));
  else if(path.includes('/pulls/')) console.log(JSON.stringify({...JSON.parse(readFileSync(state))[0],mergeable:false}));
  else if(path==='user') console.log('{"login":"test","id":7,"name":"검사 계정"}');

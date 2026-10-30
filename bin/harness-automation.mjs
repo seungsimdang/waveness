@@ -200,6 +200,79 @@ function prepare(hub, command, project, extra = {}) {
   return result.stdout;
 }
 
+export function deleteBranch(repo, pr, merged, prefix, call = gh, push = spawnSync, cwd = ROOT) {
+  const branch = pr.head?.ref;
+  if (!REPO.test(repo) || !prefix.startsWith("harness/sync/") || !branch?.startsWith(prefix) || !pr.body?.includes(MARKER) ||
+    pr.head.repo?.full_name !== repo || !pr.head.sha ||
+    git(cwd, "check-ref-format", "--branch", branch) !== branch) return false;
+  const request = (path) => JSON.parse(call(repo, "api", `repos/${repo}/${path}`));
+  const account = JSON.parse(call(repo, "api", "user")).login;
+  if (pr.user?.login !== account) return false;
+  const latest = request(`pulls/${pr.number}`);
+  if (latest.state !== "closed" || latest.merged !== merged || latest.head.ref !== branch ||
+    latest.head.repo?.full_name !== repo || latest.head.sha !== pr.head.sha || latest.user?.login !== account) return false;
+  const refPath = `git/ref/heads/${branch}`;
+  const refSha = () => request(refPath).object.sha;
+  let sha;
+  try { sha = refSha(); }
+  catch (error) {
+    if (/\b404\b/.test(`${error.stderr ?? ""} ${error.message ?? ""}`) && /not found/i.test(`${error.stderr ?? ""} ${error.message ?? ""}`)) return false;
+    throw error;
+  }
+  if (sha !== pr.head.sha) {
+    console.log(`${repo}#${pr.number}: 새 커밋이 있어 자동화 브랜치를 유지`);
+    return false;
+  }
+  const openPrs = JSON.parse(call(repo, "api", "--paginate", "--slurp", `repos/${repo}/pulls?state=open&per_page=100`)).flat();
+  if (openPrs.some((item) => item.number !== pr.number && item.head.ref === branch && item.head.repo?.full_name === repo)) {
+    console.log(`${repo}#${pr.number}: 다른 열린 PR이 있어 자동화 브랜치를 유지`);
+    return false;
+  }
+  const token = tokenFor(repo);
+  const result = push("git", ["-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "push",
+    `--force-with-lease=refs/heads/${branch}:${sha}`, `https://github.com/${repo}.git`, `:refs/heads/${branch}`], {
+    cwd, encoding: "utf8", env: { ...process.env, ...(token && { GH_TOKEN: token }) },
+  });
+  if (result.error || result.status !== 0) {
+    let current;
+    try { current = refSha(); }
+    catch (error) {
+      if (/\b404\b/.test(`${error.stderr ?? ""} ${error.message ?? ""}`) && /not found/i.test(`${error.stderr ?? ""} ${error.message ?? ""}`)) return false;
+      throw new Error(`${repo}#${pr.number}: 자동화 브랜치 삭제 후 ref 확인 실패`);
+    }
+    if (current !== sha) {
+      console.log(`${repo}#${pr.number}: 삭제 중 새 커밋이 생겨 자동화 브랜치를 유지`);
+      return false;
+    }
+    throw new Error(`${repo}#${pr.number}: 자동화 브랜치 삭제 실패`);
+  }
+  console.log(`${repo}#${pr.number}: 자동화 브랜치 삭제`);
+  return true;
+}
+
+export function cleanupBranches(repo, prefix = "harness/sync/", call = gh, removeBranch = deleteBranch) {
+  if (!REPO.test(repo) || !prefix.startsWith("harness/sync/")) throw new Error("자동화 저장소·브랜치 범위 확인 실패");
+  const refs = JSON.parse(call(repo, "api", "--paginate", "--slurp", `repos/${repo}/git/matching-refs/heads/${prefix}`)).flat();
+  const existing = new Set(refs.flatMap(({ ref }) => typeof ref === "string" && ref.startsWith("refs/heads/")
+    ? [ref.slice("refs/heads/".length)] : []));
+  if (!existing.size) return;
+  const request = (state) => JSON.parse(call(repo, "api", "--paginate", "--slurp", `repos/${repo}/pulls?state=${state}&per_page=100`)).flat();
+  const account = JSON.parse(call(repo, "api", "user")).login;
+  const automated = (pr) => pr.body?.includes(MARKER) && typeof pr.head?.ref === "string" &&
+    pr.head.repo?.full_name === repo && pr.user?.login === account && pr.head.ref.startsWith(prefix);
+  const open = request("open").filter(automated);
+  const closed = request("closed").filter(automated);
+  for (const pr of closed) {
+    if (!existing.has(pr.head.ref)) continue;
+    const branchPrefix = `${pr.head.ref.split("/").slice(0, 3).join("/")}/`;
+    if (!/^harness\/sync\/[^/]+\/$/.test(branchPrefix)) continue;
+    const merged = Boolean(pr.merged_at);
+    const replaced = (item) => item.number > pr.number && item.head.ref !== pr.head.ref && item.head.ref.startsWith(branchPrefix);
+    const hasReplacement = open.some(replaced) || closed.some((item) => replaced(item) && Boolean(item.merged_at));
+    if (merged || hasReplacement) removeBranch(repo, pr, merged, branchPrefix, call);
+  }
+}
+
 function publish(repo, base, path, key, source, allowed) {
   const baseSha = git(path, "rev-parse", `origin/${base}`);
   const files = git(path, "diff", "--name-only", baseSha, "HEAD").split("\n").filter(Boolean);
@@ -227,11 +300,15 @@ function publish(repo, base, path, key, source, allowed) {
   const url = gh(repo, "pr", "create", "--repo", repo, "--base", base, "--head", branch,
     "--title", "chore(harness): 공용 하네스 자동 업데이트", "--body", body);
   console.log(url);
-  for (const pr of prs.filter((item) => item.body?.includes(MARKER) && item.head.ref.startsWith(`harness/sync/${key}/`)))
+  const account = JSON.parse(gh(repo, "api", "user")).login;
+  for (const pr of prs.filter((item) => item.body?.includes(MARKER) && item.head.ref.startsWith(`harness/sync/${key}/`) &&
+    item.head.repo?.full_name === repo && item.user?.login === account)) {
     gh(repo, "pr", "close", String(pr.number), "--repo", repo);
+    deleteBranch(repo, pr, false, `harness/sync/${key}/`);
+  }
 }
 
-export function mergeReady(repo, base, allowed, source, call = gh, restrictVercel = false) {
+export function mergeReady(repo, base, allowed, source, call = gh, restrictVercel = false, removeBranch = deleteBranch) {
   const request = (path) => JSON.parse(call(repo, "api", `repos/${repo}/${path}`));
   const prs = request(`pulls?state=open&base=${encodeURIComponent(base)}&per_page=100`);
   for (const item of prs) {
@@ -268,6 +345,7 @@ export function mergeReady(repo, base, allowed, source, call = gh, restrictVerce
       "-f", `sha=${pr.head.sha}`, "-f", "merge_method=merge"));
     if (!result.merged) throw new Error(`${repo}#${pr.number}: GitHub 병합 거절`);
     console.log(`${repo}#${pr.number}: 검사 통과 후 병합`);
+    removeBranch(repo, pr, true, "harness/sync/", call);
     break;
   }
 }
@@ -285,6 +363,14 @@ function regenerate(hub) {
 export function coordinate() {
   const config = json(join(ROOT, ".harness/projects.json"));
   const errors = [];
+  for (const repo of new Set([...config.projects.map((project) => project.repo), config.hub, config.upstream].filter(Boolean))) {
+    try { cleanupBranches(repo); }
+    catch (error) {
+      const message = error instanceof Error ? error.message.split("\n")[0].replace(/https:\/\/[^\s]+/g, "[URL]") : "오류";
+      console.error(`${repo}: 자동화 브랜치 정리 중단 (${message})`);
+      errors.push(repo);
+    }
+  }
   for (const target of config.projects) {
     const temp = mkdtempSync(join(tmpdir(), "harness-pr-"));
     try {
