@@ -148,6 +148,15 @@ for (const tool of ['.claude', '.codex']) {
 		assert.equal(lint('echo "git commit"'), 0);
 		assert.equal(lint(`cd ${repo} && git commit -m "a"`, marks), 2);
 		assert.equal(lint(`git -C ${repo} commit -m "a"`, marks), 2);
+		writeFileSync(join(repo, 'b.ts'), 'ok\n');
+		mkdirSync(join(repo, '.harness'));
+		writeFileSync(join(repo, '.harness/biome-check.mjs'),
+			'if (!process.argv.includes("--error-on-warnings")) throw new Error("경고 옵션 누락"); console.error("문장 사이 빈 줄"); process.exit(1);\n');
+		const spacing = run(tool, 'block-lint-warnings-on-commit', {
+			cwd: repo, tool_input: { command: 'git commit -m "a"' }
+		}, repo);
+		assert.equal(spacing.status, 2);
+		assert.match(spacing.stderr, /문장 사이 빈 줄/);
 		rmSync(join(repo, 'biome.json'));
 		assert.equal(lint('git commit -m "a"'), 0);
 	});

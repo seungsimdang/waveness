@@ -66,6 +66,15 @@ test('필수 설정·경고 차단·타입 검사가 없으면 성공으로 건�
 		assert.throws(() => checkPlan(root), /typecheck/);
 		config(root);
 		assert.equal(checkPlan(root).tasks.length, 3);
+		assert.deepEqual(checkPlan(root).tasks[0], [
+			'node', '.harness/biome-check.mjs', 'check', '.', '--error-on-warnings'
+		]);
+		config(root, { lint: [['npm', 'exec', '--', 'biome', 'check', 'src', '--error-on-warnings']] });
+		assert.deepEqual(checkPlan(root).tasks[0], [
+			'node', '.harness/biome-check.mjs', 'check', 'src', '--error-on-warnings'
+		]);
+		config(root, { lint: [['pnpm', 'exec', 'eslint', '.', '--max-warnings=0']] });
+		assert.deepEqual(checkPlan(root).tasks[0], ['pnpm', 'exec', 'eslint', '.', '--max-warnings=0']);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -200,6 +209,9 @@ test('새 등록은 strict lint 설정을 생성하고 실제 Git 커밋은 검�
 	try {
 		installChecks(root);
 		assert.ok(checkPlan(root).tasks.length);
+		assert.deepEqual(JSON.parse(readFileSync(join(root, '.harness/checks.json'), 'utf8')).lint, [
+			['node', '.harness/biome-check.mjs', 'check', '.', '--error-on-warnings']
+		]);
 		for (const file of ['pre-commit.mjs', 'install-checks.mjs'])
 			cpSync(join(source, file), join(root, '.harness', file));
 		config(root, {

@@ -142,6 +142,16 @@
 						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" check-agent-harness-sync"
 					}
 				]
+			},
+			{
+				"matcher": "Edit|Write|MultiEdit|apply_patch",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/auto-format.sh\"",
+						"timeout": 30
+					}
+				]
 			}
 		],
 		"Stop": [

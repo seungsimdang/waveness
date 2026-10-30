@@ -23,7 +23,7 @@ export function defaultChecks(root) {
 	if (!deps.husky || !/\bhusky\b/.test(scripts.prepare ?? ''))
 		throw new Error('Husky 의존성과 prepare 등록 필요');
 	const lint = deps['@biomejs/biome']
-		? exec('biome', 'check', '.', '--error-on-warnings')
+		? ['node', '.harness/biome-check.mjs', 'check', '.', '--error-on-warnings']
 		: deps.eslint
 			? exec('eslint', '.', '--max-warnings', '0')
 			: null;

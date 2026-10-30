@@ -1,0 +1,29 @@
+{
+	"name": "harness-save-format",
+	"displayName": "Seungness Save Format",
+	"description": "저장 시 프로젝트의 Biome와 공용 문장 간격 규칙 적용",
+	"version": "1.0.0",
+	"publisher": "seungness",
+	"engines": {
+		"vscode": "^1.90.0"
+	},
+	"categories": [
+		"Formatters"
+	],
+	"main": "./extension.cjs",
+	"activationEvents": [
+		"onLanguage:javascript",
+		"onLanguage:javascriptreact",
+		"onLanguage:typescript",
+		"onLanguage:typescriptreact"
+	],
+	"extensionKind": [
+		"workspace"
+	],
+	"capabilities": {
+		"untrustedWorkspaces": {
+			"supported": false
+		},
+		"virtualWorkspaces": false
+	}
+}

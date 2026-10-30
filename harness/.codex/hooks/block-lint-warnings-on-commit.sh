@@ -1,7 +1,7 @@
 #!/bin/sh
 # PreToolUse(Bash) 훅: git commit 직전에 프로젝트 linter를 경고도 실패로 처리하는 옵션으로 실행해 경고·오류가 있으면 커밋 차단
 # 프로젝트 lint 스크립트 설정과 무관하게 동작하도록 linter 설정 파일을 보고 명령과 옵션을 직접 정함
-#   biome.json(c) -> biome check --error-on-warnings
+#   biome.json(c) -> 공용 Biome·빈 줄 검사 (--error-on-warnings)
 #   eslint.config.* -> eslint --max-warnings=0
 # ponytail: 위 두 linter의 저장소 루트 설정만 지원하고 다른 linter·하위 폴더 설정·eslintrc 구형 설정은 검사 없이 통과
 # 사람이 터미널에서 직접 하는 커밋은 막지 못하므로 프로젝트 pre-commit 훅과 함께 사용
@@ -34,7 +34,11 @@ cd "$root" || exit 0
 
 if [ -f biome.json ] || [ -f biome.jsonc ]; then
   [ -x node_modules/.bin/biome ] || exit 0
-  set -- node_modules/.bin/biome check --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true
+  if [ -f .harness/biome-check.mjs ]; then
+    set -- node .harness/biome-check.mjs check --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true
+  else
+    set -- node_modules/.bin/biome check --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true
+  fi
   pattern='.'
 elif ls eslint.config.* >/dev/null 2>&1; then
   [ -x node_modules/.bin/eslint ] || exit 0

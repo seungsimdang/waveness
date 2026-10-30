@@ -212,6 +212,16 @@
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/check-agent-harness-sync.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/auto-format.sh\"",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "Stop": [

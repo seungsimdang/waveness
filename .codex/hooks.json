@@ -138,6 +138,16 @@
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/codex-tool-adapter.mjs\" check-agent-harness-sync"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/auto-format.sh\"",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "Stop": [

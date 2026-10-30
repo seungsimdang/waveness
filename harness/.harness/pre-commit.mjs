@@ -47,12 +47,20 @@ export function checkPlan(root) {
 	if (!existsSync(file))
 		throw new Error('.harness/checks.json 없음: node .harness/install-checks.mjs 실행 필요');
 	const config = JSON.parse(readFileSync(file, 'utf8'));
-	const lint = commands(config.lint, 'lint');
+	// 기존 프로젝트 설정도 공용 실행기를 거쳐 Biome와 빈 줄 검사를 함께 실행한다.
+	const lint = commands(config.lint, 'lint').map(args => {
+		const index = args.indexOf('biome');
+		if (index >= 0 && ['', 'pnpm exec', 'npm exec --', 'npm exec', 'npx']
+			.includes(args.slice(0, index).join(' ')))
+			return ['node', '.harness/biome-check.mjs', ...args.slice(index + 1)];
+		return args;
+	});
 	// 경고 차단 옵션은 프로젝트 설정에서도 빠뜨릴 수 없도록 확인
 	if (
 		!lint.some(
 			args =>
-				(args.includes('biome') && args.includes('--error-on-warnings')) ||
+				((args.includes('biome') || args.includes('.harness/biome-check.mjs')) &&
+					args.includes('--error-on-warnings')) ||
 				(args.includes('eslint') &&
 					(args.includes('--max-warnings=0') ||
 						args.some((arg, i) => arg === '--max-warnings' && args[i + 1] === '0')))
