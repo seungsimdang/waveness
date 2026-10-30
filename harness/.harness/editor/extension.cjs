@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- VS Code 확장 진입점은 CommonJS로 로드된다. */
 const { execFile } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const { delimiter, dirname, join } = require('node:path');

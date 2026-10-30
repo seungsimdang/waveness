@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- VS Code 테스트 진입점은 CommonJS로 로드된다. */
 // VS Code --extensionTestsPath로 실행하는 실제 저장 검증. 격리된 테스트 작업 공간에서만 사용한다.
 const assert = require('node:assert/strict');
 const { readFileSync, writeFileSync } = require('node:fs');
