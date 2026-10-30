@@ -35,7 +35,7 @@ cd "$root" || exit 0
 if [ -f biome.json ] || [ -f biome.jsonc ]; then
   [ -x node_modules/.bin/biome ] || exit 0
   if [ -f .harness/biome-check.mjs ]; then
-    set -- node .harness/biome-check.mjs check --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true
+    set -- node .harness/biome-check.mjs check --error-on-warnings --no-errors-on-unmatched
   else
     set -- node_modules/.bin/biome check --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true
   fi

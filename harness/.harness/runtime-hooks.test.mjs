@@ -174,6 +174,11 @@ for (const tool of ['.claude', '.codex']) {
 
 		assert.equal(spacing.status, 2);
 		assert.match(spacing.stderr, /문장 사이 빈 줄/);
+		writeFileSync(
+			join(repo, '.harness/biome-check.mjs'),
+			'if (process.argv.some(arg => arg.startsWith("--files-ignore-unknown"))) throw new Error("중복 옵션 전달"); if (!process.argv.includes("--error-on-warnings")) throw new Error("경고 옵션 누락");\n'
+		);
+		assert.equal(lint('git commit -m "a"'), 0);
 		rmSync(join(repo, 'biome.json'));
 		assert.equal(lint('git commit -m "a"'), 0);
 	});

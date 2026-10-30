@@ -1,5 +1,12 @@
 # 하네스 변경 이력
 
+## 2026-10-30 fix(harness): 커밋 전 Biome 검사 옵션 중복 전달 방지
+
+- Harness-Origin: `hkmold-monitoring-frontend@5206be4cb0ae7e8e335808d339544c7b7ee4da69`
+
+> - Claude·Codex 커밋 훅의 Biome 옵션 중복 전달 제거
+> - 중복 옵션 방지 및 경고 차단 유지 회귀 테스트 추가
+
 ## 2026-10-30 Biome·저장·에이전트 편집 후 자동 수정 동기화
 
 - Harness-Origin: `seungness@f96cf4e06d05a0dd0cd2bb9d0c6a0a11a8e11635`
