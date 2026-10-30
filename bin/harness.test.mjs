@@ -522,11 +522,33 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
   const { root, up, hub, sync } = setupUpstream();
   try {
     const paths = read(SRC, ".harness/upstream-paths").split("\n").filter((line) => line.startsWith(".harness/"));
-    for (const file of ["spec.test.mjs", "runtime-hooks.test.mjs", "git-guards.test.mjs", "test-titles.test.mjs", "check-comment-line-breaks.mjs", "korean-test-titles.grit"])
+    for (const file of [
+      "spec.test.mjs",
+      "runtime-hooks.test.mjs",
+      "git-guards.test.mjs",
+      "test-titles.test.mjs",
+      "check-comment-line-breaks.mjs",
+      "korean-test-titles.grit",
+      "biome-check.mjs",
+      "check-statement-spacing.mjs",
+      "statement-spacing.test.mjs",
+      "auto-format.mjs",
+      "auto-format.test.mjs",
+      "editor/",
+      "editor-host.cjs",
+      "editor.test.mjs",
+      "package-editor.mjs",
+      "install-checks.mjs",
+      "pre-commit.mjs",
+      "pre-commit.test.mjs",
+    ])
       assert.ok(paths.includes(`.harness/${file}`), file);
     appendFileSync(join(hub, ".harness/upstream-paths"), `${paths.join("\n")}\n`);
     for (const dir of [up, hub]) mkdirSync(join(dir, "harness/.harness"), { recursive: true });
     writeFileSync(join(up, "harness/.harness/runtime-hooks.test.mjs"), "// 받은 검사\n");
+    mkdirSync(join(up, "harness/.harness/editor"), { recursive: true });
+    writeFileSync(join(up, "harness/.harness/biome-check.mjs"), "// 자동 수정 실행기\n");
+    writeFileSync(join(up, "harness/.harness/editor/extension.cjs"), "// 저장 확장\n");
     git(up, "add", ".");
     commit(up, "test: 공용 검사 추가");
     git(up, "push", "-q", "origin", "HEAD:main");
@@ -536,13 +558,19 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
     assert.match(sync(), /seungness/);
     for (const dir of [up, hub]) {
       assert.equal(read(dir, "harness/.harness/runtime-hooks.test.mjs"), "// 받은 검사\n");
+      assert.equal(read(dir, "harness/.harness/biome-check.mjs"), "// 자동 수정 실행기\n");
+      assert.equal(read(dir, "harness/.harness/editor/extension.cjs"), "// 저장 확장\n");
       assert.equal(read(dir, "harness/.harness/korean-test-titles.grit"), "플러그인\n");
     }
     appendFileSync(join(hub, "harness/.harness/runtime-hooks.test.mjs"), "// 프로젝트에서 보완\n");
+    appendFileSync(join(hub, "harness/.harness/biome-check.mjs"), "// 실행기 보완\n");
+    appendFileSync(join(hub, "harness/.harness/editor/extension.cjs"), "// 확장 보완\n");
     git(hub, "add", ".");
     commit(hub, "test: 공용 검사 보완");
     assert.match(sync(), /seungness로/);
     assert.equal(read(up, "harness/.harness/runtime-hooks.test.mjs"), read(hub, "harness/.harness/runtime-hooks.test.mjs"));
+    for (const file of ["biome-check.mjs", "editor/extension.cjs"])
+      assert.equal(read(up, `harness/.harness/${file}`), read(hub, `harness/.harness/${file}`));
     assert.equal(sync(), "");
   } finally {
     rmSync(root, { recursive: true, force: true });

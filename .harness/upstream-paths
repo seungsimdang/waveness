@@ -29,3 +29,17 @@
 .harness/korean-test-titles.grit
 .harness/git-guards.test.mjs
 .harness/check-markdown-line-wrap.sh
+
+# Biome 문장 간격·저장·편집 후 자동 수정과 공용 lint 진입점
+.harness/biome-check.mjs
+.harness/check-statement-spacing.mjs
+.harness/statement-spacing.test.mjs
+.harness/auto-format.mjs
+.harness/auto-format.test.mjs
+.harness/editor/
+.harness/editor-host.cjs
+.harness/editor.test.mjs
+.harness/package-editor.mjs
+.harness/install-checks.mjs
+.harness/pre-commit.mjs
+.harness/pre-commit.test.mjs

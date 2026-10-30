@@ -82,7 +82,7 @@ waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.
 
 | 구분 | 내용 |
 | --- | --- |
-| 대상 | waveness `harness/.claude/hooks/`·`harness/.codex/hooks/` ↔ seungness `harness/` 같은 경로 |
+| 대상 | waveness `harness/.claude/hooks/`·`harness/.codex/hooks/`와 `.harness/upstream-paths`에 등록한 공용 검사기·자동 수정기·에디터 확장 ↔ seungness `harness/` 같은 경로 |
 | 제외 | waveness 루트 `.harness/upstream-paths`의 `!` 줄. 프런트엔드·feature-team 전용 훅, waveness에서 쓰지 않는 seungness 전용 훅과 그 훅을 가리키는 등록은 양방향 모두 주고받지 않음. 커밋 형식 훅(`enforce-commit-msg-style.sh`·`block-attribution-trailers.sh`)은 차단 메시지가 각 허브의 커밋 스킬(waveness `itd-commit`, seungness `git-commit`)을 가리키도록 따로 두므로, 검사 로직을 고치면 두 저장소에 각각 반영 |
 | 등록 | `hooks` 키만 등록 항목(이벤트·matcher·명령) 단위로 병합. 한쪽의 추가·삭제가 다른 쪽에 반영되고, `permissions`·`env` 등 나머지 설정은 각 저장소가 따로 가짐 |
 | 상태 | waveness 루트 `.harness/upstream.json`의 `synced`(마지막으로 맞춘 seungness 커밋) |
@@ -101,6 +101,45 @@ waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.
 한글 테스트 제목의 Biome 플러그인은 `.harness/korean-test-titles.grit`로 배포한다. Biome를 사용하는 프로젝트는 설정의 `plugins`에 `./.harness/korean-test-titles.grit`를 등록한다. 회귀 테스트는 해당 프로젝트의 `node_modules/.bin/biome`로 실행하며 Biome가 없으면 사유를 표시하고 건너뛴다. 공용화 과정에서 프로젝트의 패키지나 린트 설정을 덮어쓰지 않는다.
 
 소스·문서 검사기는 `.harness/check-*.sh`와 `.harness/check-comment-line-breaks.mjs`로 배포한다. 주석 훅은 프로젝트 `scripts/` 검사기를 우선하고, 없으면 공용 검사기를 사용한다. Git 인덱스 검사기의 lint-staged 연결 여부는 프로젝트가 정한다. 작성자 강제·프로젝트 병합 정책·React Doctor·Tailwind·admin 및 UI 컴포넌트 검사는 프로젝트 소유로 유지한다.
+
+
+### 문장 사이 빈 줄 검사
+
+Biome를 사용하는 프로젝트의 공용 lint 진입점은 다음과 같다. 프로젝트에 설치된 Biome와 TypeScript를 사용하며 추가 패키지는 설치하지 않는다.
+
+```bash
+node .harness/biome-check.mjs check . --error-on-warnings
+node .harness/biome-check.mjs check --write .
+```
+
+- 블록·함수·클래스·인터페이스·열거형 선언 뒤와 `return` 앞에 다음/이전 문장이 있으면 빈 줄을 요구한다.
+- 변수 선언과 실행 코드 사이, 여러 줄짜리 변수 선언 앞뒤에도 빈 줄을 요구한다. 연속된 한 줄 변수 선언은 묶어서 쓸 수 있다.
+- 기준은 [Airbnb의 블록 뒤 빈 줄 규칙](https://github.com/airbnb/javascript#whitespace)과 [ESLint Stylistic의 문장 구분 규칙](https://eslint.style/rules/padding-line-between-statements)이다. 여러 줄 선언의 앞뒤 구분은 긴 선언이 이어지는 코드를 위한 공용 정책이다. 의미에 따른 상태 그룹 분리는 직접 작성한다.
+- TypeScript 구문 트리의 인접 문장을 검사한다. 문자열·템플릿·JSX 본문은 수정하지 않고, 설명 주석은 다음 문장에 붙여 둔다. 기존 빈 줄은 삭제하지 않는다.
+- Biome가 성공한 뒤 `--verbose`의 실제 처리·수정 파일 목록에 있는 JS·TS 파일만 검사한다. Biome의 includes·제외·Git ignore·파일 경로·`--staged`·`--changed` 선택 결과를 그대로 따른다. 목록 형식을 해석할 수 없거나 TypeScript를 불러올 수 없으면 실패한다.
+- `check`·`lint`·`format`·`ci`를 지원하며 `--write` 또는 `--fix`에서 빈 줄을 자동 수정한다. reporter 모드는 지원하지 않는다. Biome가 먼저 실패하면 빈 줄 검사도 실행하지 않으므로 Biome 오류를 해결하고 다시 실행한다.
+- 새 연결의 기본 lint와 기존 `.harness/checks.json`의 일반적인 `biome`·`pnpm exec biome`·`npm exec -- biome`·`npx biome` 명령은 공용 pre-commit·CI에서 이 실행기를 사용한다. Claude·Codex의 커밋 전 검사도 공용 실행기를 사용한다. 프로젝트 설정 파일 자체는 덮어쓰지 않는다.
+- 터미널의 `biome` 직접 실행과 에디터의 Biome 확장은 이 검사기를 호출하지 않는다. 프로젝트 `package.json`의 lint·수정 명령에도 위 진입점을 연결해야 함께 실행된다. 저장 시 수정은 아래 공용 확장이 담당한다. 실행기와 검사기는 `.harness/` 동기화로 배포한다.
+
+검증은 `node --test .harness/statement-spacing.test.mjs`로 실행한다. 앱 의존성이 없는 허브에서는 `HARNESS_TEST_PROJECT=/설치된/프로젝트 node --test harness/.harness/statement-spacing.test.mjs`로 실제 Biome·TypeScript를 사용한다. 의존성이 없으면 해당 검증은 사유와 함께 건너뛴다.
+
+### 저장·에이전트 편집 후 자동 수정
+
+- VS Code/Cursor용 `Seungness Save Format` 확장은 저장 직전의 문서 버퍼를 공용 수정기로 전달한다. 프로젝트에 `.harness/biome-check.mjs`와 설치된 Biome·TypeScript가 있어야 한다. 확장은 신뢰한 로컬 작업 공간의 JS·TS 파일에서만 활성화한다.
+- 아래 명령으로 로컬 VSIX를 만들고 사용하는 에디터에 한 번 설치한다. 패키징에는 시스템 `zip`이 필요하며 에디터 설정 파일을 변경하지 않는다. Cursor는 `code` 대신 `cursor`를 사용한다. 확장은 프로젝트 수정기를 호출하므로 이후 검사 규칙은 하네스 동기화로 업데이트된다.
+
+```bash
+node .harness/package-editor.mjs /tmp/seungness-save-format.vsix
+code --install-extension /tmp/seungness-save-format.vsix
+```
+
+- 확장은 `onWillSaveTextDocument`의 `waitUntil`로 수정 결과를 버퍼에 적용한다. Biome 포맷·안전한 린트 수정·문장 간격 보정을 함께 수행하며 디스크를 직접 덮어쓰지 않는다. 에디터의 기존 Biome 포맷 설정과 별개로 동작한다.
+- 수정 중 문서 버전이 바뀌거나 1초 제한을 넘거나 수정에 실패하면 결과를 적용하지 않고 출력 채널과 상태 표시줄에 알린다. VS Code 자체도 저장 훅 전체에 1.5초 제한을 두며 종료 중 저장 등에는 훅을 생략할 수 있으므로 커밋·CI 검사는 유지한다.
+- `check --write --stdin-file-path=경로`는 입력 문서를 받아 수정된 코드만 stdout으로 반환한다. Biome의 실제 파일 선택을 먼저 확인하고 macOS 심볼릭 경로를 정규화해 제외 파일을 보존한다. 아직 디스크에 없는 파일은 원문을 반환하므로 최초 저장 이후부터 자동 수정을 적용한다.
+- Claude·Codex의 성공한 `Edit`·`Write`·`MultiEdit`·`apply_patch` 뒤에는 `.harness/auto-format.mjs`가 지정된 파일만 수정한다. 패치의 중복 경로·이동·삭제를 구분하고, 프로젝트 밖 경로·심볼릭 링크 탈출·동시 변경을 거부한다. 수정된 경로를 에이전트에 알려 다음 편집 전에 현재 내용을 읽게 한다. 셸 명령으로 생성·수정한 파일은 자동 추출하지 않는다.
+- 저장 훅과 편집 후 훅은 Git 인덱스를 수정하지 않는다. 커밋·CI는 기존처럼 검사만 수행한다. 연결 프로젝트는 새 하네스를 받은 뒤 적용되며, 에디터 확장은 사용자 환경에 별도로 설치한다.
+
+회귀 검사는 `.harness/auto-format.test.mjs`와 `.harness/editor.test.mjs`다. `.harness/editor-host.cjs`는 별도 임시 프로필·작업 공간에서 VS Code의 `--extensionDevelopmentPath`·`--extensionTestsPath`로 실행하는 실제 저장 검증용이며 일반 Node 테스트에는 포함하지 않는다. 저장 API의 동작·제한은 [VS Code API](https://code.visualstudio.com/api/references/vscode-api#workspace.onWillSaveTextDocument)를 따른다.
 
 
 ## 공용 pre-commit·CI 계약
