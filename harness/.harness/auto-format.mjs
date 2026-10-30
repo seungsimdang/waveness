@@ -10,23 +10,18 @@ export function editedFiles(input) {
 
 	if (tool === 'apply_patch') {
 		const patch =
-			typeof args === 'string'
-				? args
-				: args.command ?? args.patch ?? args.input ?? '';
+			typeof args === 'string' ? args : (args.command ?? args.patch ?? args.input ?? '');
 
 		return [
 			...new Set(
-				[
-					...patch.matchAll(/^\*\*\* (?:Add File|Update File|Move to): (.+)$/gm)
-				].map(match => match[1])
+				[...patch.matchAll(/^\*\*\* (?:Add File|Update File|Move to): (.+)$/gm)].map(
+					match => match[1]
+				)
 			)
 		];
 	}
 
-	return ['Edit', 'Write', 'MultiEdit'].includes(tool) &&
-		args.file_path
-		? [args.file_path]
-		: [];
+	return ['Edit', 'Write', 'MultiEdit'].includes(tool) && args.file_path ? [args.file_path] : [];
 }
 
 export function autoFormat(input) {
@@ -37,17 +32,14 @@ export function autoFormat(input) {
 	)
 		return;
 
-	const root = realpathSync(
-		input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd()
-	);
+	const root = realpathSync(input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
 
 	if (!existsSync(resolve(root, 'node_modules/.bin/biome'))) return;
 
 	const changed = [];
 
 	for (const file of editedFiles(input)) {
-		if (!/\.[cm]?[jt]sx?$/.test(file) || !existsSync(resolve(root, file)))
-			continue;
+		if (!/\.[cm]?[jt]sx?$/.test(file) || !existsSync(resolve(root, file))) continue;
 
 		const path = realpathSync(resolve(root, file));
 		const local = relative(root, path);
@@ -70,10 +62,7 @@ export function autoFormat(input) {
 	return changed;
 }
 
-if (
-	process.argv[1] &&
-	realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	try {
 		const changed = autoFormat(JSON.parse(readFileSync(0, 'utf8')));
 

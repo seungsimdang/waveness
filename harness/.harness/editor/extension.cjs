@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- VS Code 확장 진입점은 CommonJS로 로드된다. */
 const { execFile } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const { delimiter, dirname, join } = require('node:path');
@@ -72,19 +73,12 @@ function activate(context) {
 								return resolve([]);
 							}
 
-							if (
-								document.isClosed ||
-								document.version !== version ||
-								fixed === text
-							)
+							if (document.isClosed || document.version !== version || fixed === text)
 								return resolve([]);
 
 							resolve([
 								vscode.TextEdit.replace(
-									new vscode.Range(
-										document.positionAt(0),
-										document.positionAt(text.length)
-									),
+									new vscode.Range(document.positionAt(0), document.positionAt(text.length)),
 									fixed
 								)
 							]);

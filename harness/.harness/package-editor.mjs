@@ -1,13 +1,6 @@
 // 의존성 설치 없이 시스템 zip으로 VS Code/Cursor용 로컬 VSIX 생성
 import { execFileSync } from 'node:child_process';
-import {
-	cpSync,
-	mkdtempSync,
-	readFileSync,
-	realpathSync,
-	rmSync,
-	writeFileSync
-} from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,14 +26,7 @@ export function packageEditor(target) {
 
 		execFileSync(
 			'zip',
-			[
-				'-q',
-				'-r',
-				archive,
-				'[Content_Types].xml',
-				'extension.vsixmanifest',
-				'extension'
-			],
+			['-q', '-r', archive, '[Content_Types].xml', 'extension.vsixmanifest', 'extension'],
 			{ cwd: temp }
 		);
 		cpSync(archive, target);
@@ -51,13 +37,9 @@ export function packageEditor(target) {
 	}
 }
 
-if (
-	process.argv[1] &&
-	realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	try {
-		if (!process.argv[2]?.endsWith('.vsix'))
-			throw new Error('출력할 .vsix 경로가 필요합니다.');
+		if (!process.argv[2]?.endsWith('.vsix')) throw new Error('출력할 .vsix 경로가 필요합니다.');
 
 		console.log(packageEditor(process.argv[2]));
 	} catch (error) {

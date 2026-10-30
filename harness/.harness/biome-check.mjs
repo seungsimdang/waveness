@@ -12,34 +12,30 @@ import {
 export function processedFiles(output) {
 	// shortcut: Biome의 공개 --verbose 파일 목록 형식 사용. 형식이 바뀌면 조용히 생략하지 않고 실패한다.
 	const unsupported = () => {
-		throw new Error(
-			'Biome 처리 파일 목록을 읽을 수 없습니다. --verbose 출력 형식을 확인하세요.'
-		);
+		throw new Error('Biome 처리 파일 목록을 읽을 수 없습니다. --verbose 출력 형식을 확인하세요.');
 	};
 
 	if (!output.includes('  i Files processed:\n')) unsupported();
 
 	return [
 		...new Set(
-			[
-				...output.matchAll(
-					/  i Files (?:processed|fixed):\n([\s\S]*?)(?:\n\n|$)/g
-				)
-			].flatMap(match => {
-				const lines = match[1].split('\n').filter(line => line.trim());
+			[...output.matchAll(/ {2}i Files (?:processed|fixed):\n([\s\S]*?)(?:\n\n|$)/g)].flatMap(
+				match => {
+					const lines = match[1].split('\n').filter(line => line.trim());
 
-				if (!lines.length) unsupported();
+					if (!lines.length) unsupported();
 
-				return lines.flatMap(line => {
-					if (line === '  ! The list is empty.') return [];
+					return lines.flatMap(line => {
+						if (line === '  ! The list is empty.') return [];
 
-					const file = line.match(/^  - (.+)$/);
+						const file = line.match(/^ {2}- (.+)$/);
 
-					if (!file) unsupported();
+						if (!file) unsupported();
 
-					return [file[1]];
-				});
-			})
+						return [file[1]];
+					});
+				}
+			)
 		)
 	];
 }
@@ -55,7 +51,7 @@ export function runBiome(args, root = process.cwd()) {
 
 	const result = spawnSync(
 		resolve(root, 'node_modules/.bin/biome'),
-		[...args, '--verbose', '--colors=off'],
+		[...args, '--verbose', '--colors=off', '--files-ignore-unknown=true'],
 		{ cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
 	);
 
@@ -67,9 +63,7 @@ export function runBiome(args, root = process.cwd()) {
 
 	const files = processedFiles(result.stdout.replaceAll('\r\n', '\n'));
 
-	const write = args.some(arg =>
-		['--write', '--fix', '--write=true', '--fix=true'].includes(arg)
-	);
+	const write = args.some(arg => ['--write', '--fix', '--write=true', '--fix=true'].includes(arg));
 
 	return checkStatementFiles(root, files, write) ? 0 : 1;
 }
@@ -99,6 +93,7 @@ export function formatBuffer(root, file, text) {
 			'check',
 			'--verbose',
 			'--colors=off',
+			'--files-ignore-unknown=true',
 			'--no-errors-on-unmatched',
 			'--max-diagnostics=0',
 			file
@@ -108,8 +103,7 @@ export function formatBuffer(root, file, text) {
 
 	if (scope.error) throw scope.error;
 
-	if (!processedFiles(scope.stdout.replaceAll('\r\n', '\n')).length)
-		return text;
+	if (!processedFiles(scope.stdout.replaceAll('\r\n', '\n')).length) return text;
 
 	const result = spawnSync(
 		biome,
@@ -118,29 +112,19 @@ export function formatBuffer(root, file, text) {
 	);
 
 	if (result.error || result.status !== 0)
-		throw new Error(
-			result.error?.message ?? result.stderr ?? 'Biome 자동 수정 실패'
-		);
+		throw new Error(result.error?.message ?? result.stderr ?? 'Biome 자동 수정 실패');
 
 	if (!/\.[cm]?[jt]sx?$/.test(file)) return result.stdout;
 
 	return statementSpacing(loadTypeScript(root), result.stdout, file).fixed;
 }
 
-if (
-	process.argv[1] &&
-	realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	try {
 		const args = process.argv.slice(2);
 		const stdin = args.find(arg => arg.startsWith('--stdin-file-path='));
 
-		if (
-			stdin &&
-			args.length === 3 &&
-			args[0] === 'check' &&
-			args.includes('--write')
-		)
+		if (stdin && args.length === 3 && args[0] === 'check' && args.includes('--write'))
 			process.stdout.write(
 				formatBuffer(
 					process.cwd(),

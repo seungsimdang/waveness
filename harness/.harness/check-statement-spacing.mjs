@@ -3,8 +3,25 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 
-export const loadTypeScript = root =>
-	createRequire(join(root, 'package.json'))('typescript');
+export function loadTypeScript(root) {
+	const require = createRequire(join(root, 'package.json'));
+	const ts = require('typescript');
+
+	if (typeof ts.createSourceFile === 'function' && ts.ScriptTarget) return ts;
+
+	// TypeScript 7은 기존 compiler API를 제공하지 않아 프로젝트의 별도 6.x 설치를 사용한다.
+	try {
+		const compiler = require('typescript-compiler');
+
+		if (typeof compiler.createSourceFile === 'function' && compiler.ScriptTarget) return compiler;
+	} catch (error) {
+		if (error.code !== 'MODULE_NOT_FOUND') throw error;
+	}
+
+	throw new Error(
+		'TypeScript compiler API 필요: pnpm add -D typescript-compiler@npm:typescript@^6'
+	);
+}
 
 export function statementSpacing(ts, text, file) {
 	const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
@@ -45,8 +62,7 @@ export function statementSpacing(ts, text, file) {
 		let right = next.getStart(source);
 
 		// 같은 줄의 주석은 앞 문장에 남기고, 다음 문장의 설명 주석 앞에 빈 줄을 넣는다.
-		for (const comment of ts.getTrailingCommentRanges(text, left) ?? [])
-			left = comment.end;
+		for (const comment of ts.getTrailingCommentRanges(text, left) ?? []) left = comment.end;
 
 		const comments = ts.getLeadingCommentRanges(text, left) ?? [];
 
@@ -110,9 +126,7 @@ export function checkStatementFiles(root, files, write = false) {
 	}
 
 	if (write)
-		console.log(
-			`문장 간격: ${results.filter(result => result.edits.length).length}개 파일 수정`
-		);
+		console.log(`문장 간격: ${results.filter(result => result.edits.length).length}개 파일 수정`);
 
 	return write || results.every(result => !result.edits.length);
 }

@@ -43,10 +43,10 @@ test('저장 훅은 버퍼를 전달하고 동시 편집·수정 실패·신뢰�
 		}
 	};
 
-	const module = { exports: {} };
+	const extensionModule = { exports: {} };
 
 	runInNewContext(readFileSync(join(source, 'editor/extension.cjs'), 'utf8'), {
-		module,
+		module: extensionModule,
 		process,
 		require: name => {
 			if (name === 'vscode') return vscode;
@@ -72,7 +72,7 @@ test('저장 훅은 버퍼를 전달하고 동시 편집·수정 실패·신뢰�
 			return require(name);
 		}
 	});
-	module.exports.activate({ subscriptions: [] });
+	extensionModule.exports.activate({ subscriptions: [] });
 
 	const document = {
 		uri: { scheme: 'file', fsPath: '/project/a.ts' },

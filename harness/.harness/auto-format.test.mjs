@@ -46,10 +46,9 @@ test('편집 대상 추출은 패치의 중복·이동·삭제와 실패한 도�
 		}),
 		['new.ts']
 	);
-	assert.deepEqual(
-		editedFiles({ tool_name: 'Write', tool_input: { file_path: 'a.ts' } }),
-		['a.ts']
-	);
+	assert.deepEqual(editedFiles({ tool_name: 'Write', tool_input: { file_path: 'a.ts' } }), [
+		'a.ts'
+	]);
 	assert.deepEqual(
 		editedFiles({
 			tool_name: 'Bash',
@@ -66,21 +65,12 @@ test('실제 도구로 저장 버퍼·에이전트 편집을 수정하고 제외
 }, () => {
 	const root = mkdtempSync(join(tmpdir(), 'harness-auto-format-'));
 
-	const git = (...args) =>
-		execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+	const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
 
 	try {
-		symlinkSync(
-			join(project, 'node_modules'),
-			join(root, 'node_modules'),
-			'dir'
-		);
+		symlinkSync(join(project, 'node_modules'), join(root, 'node_modules'), 'dir');
 		mkdirSync(join(root, '.harness'));
-		for (const file of [
-			'biome-check.mjs',
-			'check-statement-spacing.mjs',
-			'auto-format.mjs'
-		])
+		for (const file of ['biome-check.mjs', 'check-statement-spacing.mjs', 'auto-format.mjs'])
 			cpSync(join(source, file), join(root, '.harness', file));
 
 		writeFileSync(join(root, 'package.json'), '{}');
@@ -97,8 +87,7 @@ test('실제 도구로 저장 버퍼·에이전트 편집을 수정하고 제외
 		const original = 'export const untouched = 1;\n';
 		const input = 'export function read(){const value=2;return value}';
 
-		const expected =
-			'export function read() {\n  const value = 2;\n\n  return value;\n}\n';
+		const expected = 'export function read() {\n  const value = 2;\n\n  return value;\n}\n';
 
 		writeFileSync(join(root, 'a.ts'), original);
 		writeFileSync(join(root, 'ignored.ts'), original);
@@ -116,12 +105,7 @@ test('실제 도구로 저장 버퍼·에이전트 편집을 수정하고 제외
 
 		const cli = spawnSync(
 			process.execPath,
-			[
-				'.harness/biome-check.mjs',
-				'check',
-				'--write',
-				'--stdin-file-path=a.ts'
-			],
+			['.harness/biome-check.mjs', 'check', '--write', '--stdin-file-path=a.ts'],
 			{ cwd: root, input, encoding: 'utf8', env }
 		);
 
@@ -161,20 +145,16 @@ test('실제 도구로 저장 버퍼·에이전트 편집을 수정하고 제외
 		for (const tool of ['.claude', '.codex']) {
 			writeFileSync(join(root, 'a.ts'), input);
 
-			const response = spawnSync(
-				'sh',
-				[join(source, '..', tool, 'hooks/auto-format.sh')],
-				{
+			const response = spawnSync('sh', [join(source, '..', tool, 'hooks/auto-format.sh')], {
+				cwd: root,
+				env,
+				encoding: 'utf8',
+				input: JSON.stringify({
 					cwd: root,
-					env,
-					encoding: 'utf8',
-					input: JSON.stringify({
-						cwd: root,
-						tool_name: 'apply_patch',
-						tool_input: { command: '*** Update File: a.ts' }
-					})
-				}
-			);
+					tool_name: 'apply_patch',
+					tool_input: { command: '*** Update File: a.ts' }
+				})
+			});
 
 			assert.equal(response.status, 0, response.stderr);
 			assert.match(

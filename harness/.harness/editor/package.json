@@ -7,9 +7,7 @@
 	"engines": {
 		"vscode": "^1.90.0"
 	},
-	"categories": [
-		"Formatters"
-	],
+	"categories": ["Formatters"],
 	"main": "./extension.cjs",
 	"activationEvents": [
 		"onLanguage:javascript",
@@ -17,9 +15,7 @@
 		"onLanguage:typescript",
 		"onLanguage:typescriptreact"
 	],
-	"extensionKind": [
-		"workspace"
-	],
+	"extensionKind": ["workspace"],
 	"capabilities": {
 		"untrustedWorkspaces": {
 			"supported": false
