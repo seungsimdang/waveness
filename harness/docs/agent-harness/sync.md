@@ -147,7 +147,7 @@ code --install-extension /tmp/seungness-save-format.vsix
 ```bash
 node .harness/check-tailwind-lint.mjs --staged       # pre-commit·CI가 실행
 node .harness/check-tailwind-lint.mjs                # 추적 파일 전체 검사
-node .harness/check-tailwind-lint.mjs --write [파일]  # 표기 위반 수정 후 Biome가 있으면 해당 파일 포맷. Git 인덱스는 변경하지 않음
+node .harness/check-tailwind-lint.mjs --write [파일]  # 표기 위반 수정 후 Biome가 있으면 해당 파일에 안전 수정(포맷·클래스 정렬 등) 적용. Git 인덱스는 변경하지 않음
 ```
 
 - Tailwind CSS IntelliSense(`@tailwindcss/language-service` 0.16.0)의 기본 린트 중 v4에서 동작하는 규칙을 커밋에서 차단한다. 새 패키지 없이 프로젝트에 설치된 Tailwind 디자인 시스템으로 판정하고, 첫 번째 진입 CSS의 `@theme`을 읽는다.

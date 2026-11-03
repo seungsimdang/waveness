@@ -428,16 +428,16 @@ export async function run(root, args) {
 		for (const message of messages) console.error(`  ${message}`);
 	}
 
-	// 클래스가 짧아지면 줄바꿈 결과가 달라지므로 수정한 파일만 다시 포맷
+	// 클래스가 바뀌면 줄바꿈·클래스 정렬 결과가 달라지므로 수정한 파일만 Biome 안전 수정 적용
 	const biome = join(root, 'node_modules/.bin/biome');
 
 	if (rewritten.length && existsSync(biome)) {
-		const format = spawnSync(biome, ['format', '--write', ...rewritten], {
+		const format = spawnSync(biome, ['check', '--write', ...rewritten], {
 			cwd: root,
 			stdio: 'inherit'
 		});
 
-		if (format.error || format.status !== 0) throw new Error('수정 파일 포맷 실패');
+		if (format.error || format.status !== 0) throw new Error('수정 파일 Biome 수정 실패');
 	}
 
 	if (!violations) return 0;
