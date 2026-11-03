@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -481,28 +481,36 @@ test('클로드 에이전트 실행 훅이 fork 스폰과 worktree 진입, 격�
 
 	try {
 		spawnSync('git', ['init', '-q'], { cwd: fixture, env });
+		const isolation = (subagent_type, isolationValue) =>
+			claude(
+				'require-isolation-when-dirty',
+				{ tool_input: { subagent_type, ...(isolationValue ? { isolation: isolationValue } : {}) } },
+				fixture
+			).status;
+
+		const agents = join(fixture, '.claude', 'agents');
+		mkdirSync(agents, { recursive: true });
+		writeFileSync(join(agents, 'implementer.md'), '---\nname: implementer\ntools: Read, Edit, Bash\n---\n');
+		writeFileSync(join(agents, 'reader.md'), '---\nname: reader\ntools: Read, Grep\n---\n');
+		writeFileSync(join(agents, 'inherits.md'), '---\nname: inherits\n---\n');
+		spawnSync('git', ['add', '-A'], { cwd: fixture, env });
+		spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init'], { cwd: fixture, env });
+
+		// 쓰기 가능 역할(정의 tools, tools 없음, 이름 미상 내장)은 깨끗한 트리에서도 격리 없이 차단
+		for (const type of ['implementer', 'inherits', 'general-purpose', undefined]) {
+			assert.equal(isolation(type), 2);
+			assert.equal(isolation(type, 'worktree'), 0);
+		}
+
+		// 다른 subagent가 남긴 worktree 폴더는 dirty로 보지 않음
+		mkdirSync(join(fixture, '.claude', 'worktrees', 'agent-x'), { recursive: true });
+		writeFileSync(join(fixture, '.claude', 'worktrees', 'agent-x', 'probe.txt'), 'x');
+		assert.equal(isolation('implementer', 'worktree'), 0);
+
+		// 미커밋 변경이 있으면 쓰기 가능 역할은 격리 스폰도 차단, 읽기 전용 역할은 격리 없이 통과
 		writeFileSync(join(fixture, 'dirty.txt'), 'changed');
-		assert.equal(
-			claude(
-				'require-isolation-when-dirty',
-				{ tool_input: { subagent_type: 'frontend-developer' } },
-				fixture
-			).status,
-			2
-		);
-		assert.equal(
-			claude(
-				'require-isolation-when-dirty',
-				{
-					tool_input: {
-						subagent_type: 'frontend-developer',
-						isolation: 'worktree'
-					}
-				},
-				fixture
-			).status,
-			0
-		);
+		assert.equal(isolation('implementer', 'worktree'), 2);
+		for (const type of ['reader', 'Explore', 'web-fetch']) assert.equal(isolation(type), 0);
 	} finally {
 		rmSync(fixture, { recursive: true, force: true });
 	}
@@ -666,6 +674,67 @@ for (const tool of ['.claude', '.codex']) {
 	});
 }
 
+test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 입력을 판정 대상에 넣는다', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'portfolio-judge-'));
+
+	try {
+		const seen = join(dir, 'prompt.txt');
+		const judgeBin = join(dir, 'judge.sh');
+
+		writeFileSync(judgeBin, `#!/bin/sh\ncat > "${seen}"\necho '{"ok": true}'\n`);
+		chmodSync(judgeBin, 0o755);
+
+		const transcript = join(dir, 'transcript.jsonl');
+		const question = {
+			question: '주기는?',
+			multiSelect: false,
+			options: [{ label: '3초' }, { label: '5초' }]
+		};
+		const answer = value => ({
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: value }] },
+			toolUseResult: { questions: [question], answers: { '주기는?': value } }
+		});
+		const prompt = { type: 'user', uuid: 'u1', message: { content: '진행해' } };
+
+		const stop = (message, session, ...entries) => {
+			rmSync(seen, { force: true });
+			writeFileSync(
+				transcript,
+				[prompt, ...entries].map(entry => JSON.stringify(entry)).join('\n')
+			);
+
+			return spawnSync('sh', [resolve(H, '.claude/hooks/judge-unverified-claims.sh')], {
+				input: JSON.stringify({
+					last_assistant_message: message,
+					transcript_path: transcript,
+					session_id: session
+				}),
+				encoding: 'utf8',
+				cwd: H,
+				env: { ...env, TMPDIR: dir, STOP_JUDGE_BIN: judgeBin }
+			}).stdout;
+		};
+
+		const deferred = '`/cd` 후 동작은 미시험입니다.';
+
+		assert.equal(JSON.parse(stop(deferred, 's1')).decision, 'block');
+		assert.equal(existsSync(seen), false);
+		assert.equal(stop(deferred, 's1'), '');
+		assert.equal(existsSync(seen), true);
+
+		assert.equal(stop('권한이 없어 확인하지 못했습니다.', 's2'), '');
+		assert.equal(stop('`확인하지 않았습니다` 표현을 막습니다.', 's3'), '');
+
+		stop('답했습니다.', 's4', answer('왜 3초임?'));
+		assert.ok(readFileSync(seen, 'utf8').includes('왜 3초임?'));
+		stop('답했습니다.', 's5', answer('5초'));
+		assert.ok(!readFileSync(seen, 'utf8').split('[이번 턴 도구 기록]')[0].includes('\n5초\n'));
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test('클로드 리뷰 누락 훅이 위반을 검출한다', {
 	skip: !existsSync(join(H, '.claude/hooks/require-coderabbit-run.sh'))
 }, () => {
@@ -812,6 +881,24 @@ test('AskUserQuestion 직접 입력 답변 뒤 같은 응답의 재질문을 차
 		assert.equal(decide(prompt, answer('지원, DB 공유')), 'allow');
 		assert.equal(decide(answer('best practice가 뭔데?'), prompt), 'allow');
 
+		// subagent의 수정은 사용자 답변과 무관하므로 허용
+		writeFileSync(transcript, [prompt, answer('왜 3초임?')].map(entry => JSON.stringify(entry)).join('\n'));
+		assert.equal(
+			run('.claude', 'block-reask-after-free-text-answer', {
+				transcript_path: transcript,
+				tool_name: 'Edit',
+				agent_id: 'a1'
+			}).stdout.trim(),
+			''
+		);
+		assert.ok(
+			JSON.parse(readFileSync(resolve(H, '.claude/settings.json'), 'utf8')).hooks.PreToolUse.some(
+				({ matcher, hooks }) =>
+					matcher.split('|').includes('Edit') &&
+					hooks.some(({ command }) => command.includes('block-reask-after-free-text-answer'))
+			)
+		);
+
 		// 다른 세션·subagent 메시지로 시작한 새 턴에서도 재질문 허용
 		const peer = {
 			type: 'user',
@@ -875,7 +962,7 @@ for (const tool of ['.claude', '.codex']) {
 		});
 	});
 
-	// Claude는 Stop의 judge-unverified-claims.sh(LLM 판정)로 대체되어 정규식 훅이 Codex에만 있음
+	// Claude는 같은 판정을 Stop의 judge-unverified-claims.sh에서 하므로 이 훅이 Codex에만 있음
 	test(`${tool} 미확인 추측 보고 훅이 추측과 미확인이 한 문장에 있으면 한 번 막는다`, {
 		skip: tool !== '.codex'
 	}, () => {
@@ -899,6 +986,19 @@ for (const tool of ['.claude', '.codex']) {
 			assert.equal(stop('패치 적용 검사를 통과했습니다. 충돌은 없습니다.'), '');
 			assert.equal(stop('권한이 없어 확인하지 못했습니다. 확인 방법은 아래와 같습니다.'), '');
 			assert.equal(stop('"~것으로 보지만 미확인" 같은 보고를 막는 훅을 추가했습니다.'), '');
+
+			for (const deferred of [
+				'시험해 보기 전에는 확정할 수 없습니다.',
+				'이번에 다시 시험하지는 않았습니다.',
+				'새 훅을 실제로 만들어 돌려 본 결과는 아닙니다.',
+				'`/cd` 후 동작은 미시험입니다.',
+				'문서에서 찾지 못해 근거는 없습니다.',
+				'대기 시간은 측정하지 않았습니다.'
+			]) {
+				assert.equal(JSON.parse(stop(deferred)).decision, 'block');
+				assert.equal(stop(deferred, true), '');
+			}
+			assert.equal(stop('> 시험해 보기 전에는 확정할 수 없습니다.'), '');
 		});
 	});
 }

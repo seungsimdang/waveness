@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop 훅(차단): 마지막 응답의 한 문장에 추측 표현과 미확인 꼬리표가 함께 있으면 턴 종료를 한 번 막음
+# Stop 훅(차단): 마지막 응답의 한 문장에 추측 표현과 미확인 꼬리표가 함께 있거나 확인 미룸 표현이 있으면 턴 종료를 한 번 막음
 # 그 턴에 도구로 확인할 수 있던 사실을 "~것으로 보지만 아직 확인하지 않았다"로 보고한 사고가 있어 추가함
 # 실제로 확인할 수 있었는지는 훅이 알 수 없어, 한 번 막고 재응답(stop_hook_active)은 통과시킴
 # 코드 표기와 큰따옴표 인용은 규칙을 설명하는 문장일 수 있어 판정에서 뺌
@@ -12,7 +12,7 @@
 
 input=$(cat)
 
-printf '%s' "$input" | MARK_DIR="${TMPDIR:-/tmp}/codex-why-judge" python3 -c '
+printf '%s' "$input" | DEFERRED_PATTERN_FILE="$(dirname "$0")/../../.harness/deferred-claims-pattern.txt" MARK_DIR="${TMPDIR:-/tmp}/codex-why-judge" python3 -c '
 import json, os, re, subprocess, sys, tempfile
 
 JUDGE_TIMEOUT_SECONDS = 60
@@ -39,14 +39,20 @@ def block(reason):
     print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))
     sys.exit(0)
 
-text = re.sub(r"`[^`]*`|\"[^\"\n]*\"|“[^”\n]*”", "", answer)
+text = re.sub(r"`[^`]*`|\"[^\"\n]*\"|“[^”\n]*”|^>.*$", "", answer, flags=re.M)
 hedge = re.compile(r"것으로 (보입니다|보이지만|보이나|보이고|봅니다|보지만|예상|추정)|것 같(습니다|지만|은데|아)|(가능성|확률)이 높|아마")
 unverified = re.compile(r"확인하지 (않았|못했|않은)|확인 안 했|미확인|아직 확인|검증하지 (않|못)|미검증")
+# 미룸 문구는 Claude·Codex 판정 훅이 함께 쓰는 파일에서 읽고, 읽지 못하면 이 판정만 건너뜀
+try:
+    with open(os.environ["DEFERRED_PATTERN_FILE"], encoding="utf-8") as pattern_file:
+        deferred = re.compile(pattern_file.read().strip())
+except Exception:
+    deferred = None
 
 for sentence in re.split(r"(?<=[.!?])\s+|\n", text):
-    if hedge.search(sentence) and unverified.search(sentence):
+    if (hedge.search(sentence) and unverified.search(sentence)) or (deferred and deferred.search(sentence)):
         block(
-            "추측에 미확인 꼬리표를 붙인 보고가 있습니다: " + sentence.strip()[:120]
+            "확인을 미룬 보고가 있습니다: " + sentence.strip()[:120]
             + " 지금 도구로 확인할 수 있으면 확인한 결과로 다시 보고하세요. 정말 확인할 수 없으면 막힌 이유와 확인 방법을 적으세요."
         )
 

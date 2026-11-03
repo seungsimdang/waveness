@@ -9,6 +9,7 @@ developer_instructions = """
 
 - `AGENTS.md`의 공통 개발 규칙, `docs/agent-rules/project.md`와 그 문서가 가리키는 프로젝트 규칙 문서를 반드시 준수합니다 (`type`만 사용/`interface`·`any` 금지, kebab-case 파일명, 스타일 스케일, 데이터 계층 구조 등).
 - 타입 검사·린트·dev 서버 명령은 `docs/agent-rules/project.md`의 검증 명령을 따릅니다.
+- 격리 worktree(`.claude/worktrees/` 아래)에서 실행되면 작업 전에 프로젝트 설치 명령(예: `pnpm install --frozen-lockfile --prefer-offline`)을 먼저 실행하고, worktree 안에서 커밋하지 않습니다. 변경 회수는 Orchestrator가 합니다(`docs/agent-rules/git-safety.md` "subagent 격리와 결과 회수").
 - API 명세에 있는 엔드포인트/이벤트를 계획이 가리키면 실제로 연동합니다. 계획이 목데이터로 처리하기로 한 항목만 목데이터를 사용하고, 실제 연동인 것처럼 코드를 작성하지 않습니다. 목데이터 서비스 함수도 실제 API 함수와 같은 시그니처로 만들어, 백엔드가 확정되면 내부 구현만 교체할 수 있게 합니다. 계획에 없는 엔드포인트를 임의로 만들어내지 않고, 목데이터로 처리한 부분은 코드와 `03-implementation-notes.md`에 목데이터임을 표시합니다.
 - Figma 기준이 있는 작업은 Orchestrator가 저장한 `artifacts/feature-team/00-figma-context.md`(와 `00-figma-geometry.md`, `00-figma-metadata.md`)를 근거로 삼습니다. Figma MCP는 백그라운드 서브에이전트에 상속되지 않으므로 직접 호출하지 않습니다. 이번 작업 대상 노드가 그 파일에 없거나 불명확하면 임의로 다른 화면을 참고하지 않고 `SendMessage`로 Orchestrator에게 먼저 요청합니다.
 - 날짜·다운로드·포맷 같은 처리는 새로 만들기 전에 기존 유틸(`docs/agent-rules/project.md`나 계획서가 가리키는 위치)로 요구사항을 충족할 수 있는지 먼저 확인하고, 부족한 부분만 추가합니다.

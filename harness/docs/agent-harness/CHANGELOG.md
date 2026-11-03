@@ -1,5 +1,29 @@
 # 하네스 변경 이력
 
+## 2026-11-03 fix(harness): 쓰기 가능 subagent 격리 강제와 격리 결과 회수 절차 추가
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@5d5c085df47612bc393fbd9482823b75971d9bd7`
+
+> - 파일을 고칠 수 있는 subagent를 정의 tools 기준으로 판별해 isolation worktree 없이 스폰 차단
+> - 메인 작업 트리에 미커밋 변경이 있으면 격리 스폰도 차단하고 작업 커밋 amend 안내 (subagent worktree 경로 제외)
+> - 스폰 직전 작업 커밋 amend --no-edit와 회수 후 worktree 정리를 고위험 행동 승인 예외로 명시
+> - 격리 subagent의 worktree 안 커밋 금지, 설치 선행, 별도 포트 사용 규칙을 구현·검증 역할에 추가
+> - 격리 결과 회수와 worktree 정리 절차를 git 안전 수칙과 Claude 오케스트레이터에 추가, Codex는 쓰기 담당 동시 실행 금지
+> - 1 branch 1 commit 판단에서 공용 하네스 커밋 제외
+> - 런타임 훅 회귀 테스트 갱신
+
+## 2026-11-03 fix(harness): 판정 훅의 확인 미룸 보고 차단과 질문 창 직접 입력 처리 강화
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@7141b1402b887e8584ea9e232975b56ad80bb22e`
+
+> - 도구로 확인할 수 있는 사항을 미룬 보고를 Claude·Codex 판정 훅에서 문구 검사로 차단
+> - 미룸 문구를 공용 패턴 파일로 분리해 두 판정 훅의 규칙 어긋남 방지
+> - Claude 판정 기준에 확인 미룸 항목을 추가하고 미검증 표시 면제 축소
+> - 질문 창 직접 입력을 미응답 질문 판정 대상에 포함
+> - 질문 창 직접 입력 후 응답 종료까지 수정·위임·재질문 차단 (subagent 제외)
+> - 프로젝트 훅이 루트 시작 세션에서만 로드되는 제약을 하네스 문서에 명시
+> - 런타임 훅 회귀 테스트 추가
+
 ## 2026-11-03 chore(harness): 선례 조사 역할 effort 상향
 
 - Harness-Origin: `seojin-camshaft-monitoring-frontend@e449bdc228b22e89e95df2ba59fcf9ff36af156a`

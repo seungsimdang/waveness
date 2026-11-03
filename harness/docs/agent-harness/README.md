@@ -36,6 +36,8 @@ Codex는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시�
 - `block-comment-line-wrap.sh`는 프로젝트의 `scripts/check-comment-line-breaks.mjs`가 있을 때만 검사한다.
 - `block-lint-warnings-on-commit.sh`는 에이전트의 `git commit` 직전에 저장소 루트의 `biome.json(c)`이면 `biome check --error-on-warnings`, `eslint.config.*`이면 `eslint --max-warnings=0`을 HEAD 대비 변경 파일과 추적하지 않는 파일에 실행해 경고·오류가 있으면 차단한다. 다른 linter이거나 `node_modules/.bin`에 실행 파일이 없으면 통과한다. 사람이 직접 하는 커밋은 프로젝트 pre-commit 훅이 맡는다.
 
+Claude 프로젝트 훅은 세션을 프로젝트 루트에서 시작할 때만 로드된다. 하위 폴더(`src`, `artifacts/feature-team`)에서 시작하면 실행되지 않는다.
+
 런타임 훅은 사용자 승인·판단·발언 전체를 보장하지 않는다. 훅 등록과 입력 기반 검증은 실제 Claude·Codex 런타임 실행 검증과 구분한다.
 
 ## 인계와 변경 이력

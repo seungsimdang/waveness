@@ -142,7 +142,7 @@
         ]
       },
       {
-        "matcher": "AskUserQuestion",
+        "matcher": "Edit|Write|NotebookEdit|Agent|SendMessage|AskUserQuestion",
         "hooks": [
           {
             "type": "command",

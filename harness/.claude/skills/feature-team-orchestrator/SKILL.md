@@ -65,6 +65,7 @@ description: 신규 기능/화면 개발을 선례 조사-계획-구현-검증 �
     작업 도중 팀원이 저장 파일에 없는 노드를 요청하면(`SendMessage`) 같은 방식으로 원문을 조회해 파일에 추가하고 알린다.
 2. 팀원을 스폰하기 전에 `ListAgents`와 `TaskList`/`TaskGet`으로 기존 팀원 존재 여부를 확인한다. 한쪽 결과만으로 "중복 실행이 아니다"라고 단정하지 않고, 스폰 결과의 이름 접미사 발생 여부도 함께 본다.
    - 스폰 프롬프트를 쓰기 전 해당 팀원의 `.claude/agents/{역할}.md`를 Read로 먼저 확인해서, 그 파일에 이미 규정된 절차와 모순되거나 이를 무효화하는 지시를 프롬프트에 넣지 않는다. 그 파일의 `tools`에 `SendMessage`가 있는지도 확인한다 - 빠져 있으면 팀원이 발견·차단을 즉시 공유할 수 없으므로 스폰 전에 Agent 파일부터 고친다.
+   - 파일을 고칠 수 있는 팀원(implementer·integration-reviewer·spec-planner·prior-art-researcher 모두 해당)은 `isolation: "worktree"`로 스폰하고, 스폰 직전에 자신의 작업 변경을 작업 커밋에 amend해 메인 트리를 비운다. 완료 알림의 `worktreePath`에서 변경을 회수해 메인에 적용하고 worktree를 정리한다. 절차는 `docs/agent-rules/git-safety.md` "subagent 격리와 결과 회수"이며 `require-isolation-when-dirty.sh`가 격리 누락과 dirty 트리 스폰을 차단한다. 팀원 산출물(`artifacts/feature-team/*`)도 회수 전에는 메인에 없으므로 다음 단계 전에 회수한다.
    - `Agent` 도구(`subagent_type`에 팀원 Agent 파일명, `name`에 고정 팀원 이름 지정)로 스폰한다. 스폰 지시문에는 `필요 도구: Read, Edit, Bash`처럼 지시 수행에 필요한 도구를 한 줄로 선언하고 Agent 파일의 `tools`와 대조한다. `require-agent-tool-declaration.sh`가 선언 누락과 정의에 없는 도구 선언을 차단한다.
    - 스폰 결과 이름이 요청한 이름과 다르면(`-2` 등 접미사) 같은 이름의 생존/stale 세션이 있다는 신호다. 소유권은 `ListAgents`가 아니라 이 세션의 스폰 기록(자신이 스폰 시도했던 이름인지)과 로컬 Task 등록 정보로 판단한다.
      - 이 세션이 스폰한 대상이면 `TaskStop`(`task_id`에 원래 팀원 이름)으로 직접 종료한 뒤 새 이름으로 계속 진행한다.

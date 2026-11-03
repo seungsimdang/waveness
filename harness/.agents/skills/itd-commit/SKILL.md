@@ -16,7 +16,8 @@ description: ITD 티켓 커밋 컨벤션에 맞춰 커밋 메시지를 만든다
 - 해당 브랜치에 **아직 커밋이 없으면** 신규 커밋(Workflow)으로 진행한다.
 - 해당 브랜치에 **이미 커밋이 하나라도 있으면**, 새 커밋을 쌓지 않고 항상 `git commit --amend`(Amend 절차)로 그 커밋에 합친다. "커밋해"류 요청도 이 판단 기준(브랜치에 커밋 존재 여부)을 먼저 확인한 뒤 신규/amend를 스스로 정한다 - 사용자가 "amend해"라고 명시하지 않아도 브랜치에 커밋이 있으면 amend가 기본 동작이다.
 - 브랜치에 커밋이 여러 개 이미 쌓여 있는 상태(과거에 이 원칙 없이 커밋된 경우 등)를 발견하면, 임의로 `git rebase -i`나 squash를 실행하지 않고 사용자에게 상황을 보고하고 정리 방식을 확인한다.
-- 판단 방법: `git log --oneline <base-branch>..HEAD` (base는 `docs/agent-rules/branch-strategy.md`의 통합 브랜치, 프로젝트가 다르게 정했으면 `project.md` 값)로 이 브랜치에만 있는 커밋 수를 센다. 1개면 amend 대상, 0개면 신규 커밋 대상.
+- 판단 방법: `git log --oneline <base-branch>..HEAD` (base는 `docs/agent-rules/branch-strategy.md`의 통합 브랜치, 프로젝트가 다르게 정했으면 `project.md` 값)로 이 브랜치에만 있는 커밋 수를 센다. 이때 제목이 `chore(harness)`·`fix(harness)`로 시작하는 공용 하네스 커밋은 작업 커밋과 따로 두므로 세지 않는다. 남은 작업 커밋이 1개면 amend 대상(그 커밋이 HEAD가 아니면 사용자에게 보고하고 방식 확인), 0개면 신규 커밋 대상.
+- 격리 subagent 스폰 직전 amend: 작업 커밋이 이미 있고 HEAD이면 `git commit --amend --no-edit`는 미리보기·승인 없이 실행한다(`AGENTS.md` 고위험 행동 차단 예외, `docs/agent-rules/git-safety.md`). 메시지 갱신은 사용자가 커밋을 요청할 때 이 스킬의 Amend 절차로 한다.
 
 ## 커밋 컨벤션
 
