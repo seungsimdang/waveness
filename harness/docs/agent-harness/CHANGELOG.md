@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-11-03 manualMerge 저장소 병합 차단 훅 추가
+
+- 허브 등록에서 `manualMerge: true`로 지정한 저장소의 PR 병합을 Claude·Codex Bash에서 예외 없이 차단. 저장소를 변수로 넘겨 판정할 수 없는 병합도 차단
+- 사용자는 GitHub 화면이나 터미널 `! gh pr merge`로 직접 병합. 허브 등록 파일을 찾지 못하면 통과
+
 ## 2026-11-03 Tailwind IntelliSense 린트 공용 검사 추가
 
 - 설치된 Tailwind 디자인 시스템으로 IntelliSense의 v4 린트(canonical 표기·CSS 충돌·차단 클래스·CSS 지시문·테마 경로)를 스테이징 파일 기준으로 커밋에서 차단. Tailwind 미설치·v3·API 없음은 사유만 출력하고 통과.

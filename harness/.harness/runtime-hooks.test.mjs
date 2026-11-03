@@ -309,6 +309,57 @@ for (const tool of ['.claude', '.codex']) {
 			2
 		);
 	});
+	test(`${tool} manualMerge 저장소의 PR 병합만 예외 없이 차단한다`, () => {
+		const hub = mkdtempSync(join(tmpdir(), 'harness-manual-merge-'));
+		const repo = join(hub, 'project');
+
+		mkdirSync(join(hub, '.harness'));
+		mkdirSync(repo);
+		writeFileSync(
+			join(hub, '.harness/projects.json'),
+			JSON.stringify({
+				projects: [
+					{ repo: 'Org/manual-app', branch: 'main', manualMerge: true },
+					{ repo: 'Org/auto-app', branch: 'main' }
+				]
+			})
+		);
+		spawnSync('git', ['init', '-q'], { cwd: repo, env });
+		spawnSync('git', ['remote', 'add', 'origin', 'git@github.com:Org/manual-app.git'], {
+			cwd: repo,
+			env
+		});
+
+		const merge = (command, cwd = H, hubPath = hub) =>
+			spawnSync('sh', [resolve(H, tool, 'hooks', 'block-manual-merge-repo.sh')], {
+				cwd,
+				input: JSON.stringify({ tool_input: { command }, cwd }),
+				encoding: 'utf8',
+				env: { ...env, TMPDIR: marks, CLAUDE_PROJECT_DIR: cwd, HARNESS_HUB: hubPath }
+			}).status;
+
+		try {
+			for (const command of [
+				'gh pr merge 3 -R Org/manual-app --merge',
+				'gh api --method PUT repos/Org/manual-app/pulls/3/merge',
+				'for x in a:1; do gh pr merge ${x##*:} -R ${x%%:*} --merge; done'
+			])
+				assert.equal(merge(command), 2, command);
+
+			assert.equal(merge('gh pr merge 3 --merge', repo), 2);
+
+			for (const command of [
+				'gh pr merge 3 -R Org/auto-app --merge',
+				'gh pr view 3 -R Org/manual-app',
+				'git commit -m "docs: gh pr merge -R Org/manual-app 차단 설명"'
+			])
+				assert.equal(merge(command), 0, command);
+
+			assert.equal(merge('gh pr merge 3 -R Org/manual-app --merge', H, join(hub, 'none')), 0);
+		} finally {
+			rmSync(hub, { recursive: true, force: true });
+		}
+	});
 	test(`${tool} 새 브랜치 생성은 브랜치 수와 무관하고 살아 있는 worktree에만 차단된다`, () => {
 		const repo = mkdtempSync(join(tmpdir(), 'portfolio-branch-'));
 		const git = (...args) => spawnSync('git', args, { cwd: repo, env });

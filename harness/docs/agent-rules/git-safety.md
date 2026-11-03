@@ -8,6 +8,7 @@
 - `git reset --hard`, `git clean -f/-d/-x`, `git branch -D`, 경로 미지정 `git checkout -- .`
 - bare `git stash`, `git stash pop` - worktree 사이 공유 스택이라 다른 세션 것을 건드릴 수 있음
 - 다른 linked worktree가 살아 있을 때 메인 체크아웃에서 브랜치 생성(`git checkout -b`, `git switch -c`)
+- 허브 `.harness/projects.json`에서 `manualMerge: true`로 지정한 저장소의 PR 병합(`gh pr merge`, `gh api .../pulls/N/merge`). 사람이 직접 병합하라는 표시라 예외 없이 막고, 저장소를 변수로 넘겨 판정할 수 없는 병합도 막음(`block-manual-merge-repo.sh`)
 
 되돌릴 수 없거나, 다른 작업 중인 변경사항까지 함께 지울 수 있는 명령이라 사용자 승인 없이 실행하지 않는다.
 
