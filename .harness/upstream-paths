@@ -43,3 +43,5 @@
 .harness/install-checks.mjs
 .harness/pre-commit.mjs
 .harness/pre-commit.test.mjs
+.harness/check-tailwind-lint.mjs
+.harness/tailwind-lint.test.mjs

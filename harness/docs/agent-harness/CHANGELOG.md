@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-11-03 Tailwind IntelliSense 린트 공용 검사 추가
+
+- 설치된 Tailwind 디자인 시스템으로 IntelliSense의 v4 린트(canonical 표기·CSS 충돌·차단 클래스·CSS 지시문·테마 경로)를 스테이징 파일 기준으로 커밋에서 차단. Tailwind 미설치·v3·API 없음은 사유만 출력하고 통과.
+- Claude·Codex 편집 후 자동 수정에 표기 수정 연결. 저장 시 수정은 1초 제한을 넘어 연결하지 않음.
+- `sync.md`의 Tailwind 검사 소유 문구를 공용 IntelliSense 린트와 프로젝트 소유 Tailwind 규칙으로 구분.
+
 ## 2026-10-30 fix(harness): 커밋 전 Biome 검사 옵션 중복 전달 방지
 
 - Harness-Origin: `hkmold-monitoring-frontend@5206be4cb0ae7e8e335808d339544c7b7ee4da69`

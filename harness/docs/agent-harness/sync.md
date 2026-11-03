@@ -100,7 +100,7 @@ waveness의 훅 스크립트(`.claude/hooks/`, `.codex/hooks/`)와 훅 등록(`.
 
 한글 테스트 제목의 Biome 플러그인은 `.harness/korean-test-titles.grit`로 배포한다. Biome를 사용하는 프로젝트는 설정의 `plugins`에 `./.harness/korean-test-titles.grit`를 등록한다. 회귀 테스트는 해당 프로젝트의 `node_modules/.bin/biome`로 실행하며 Biome가 없으면 사유를 표시하고 건너뛴다. 공용화 과정에서 프로젝트의 패키지나 린트 설정을 덮어쓰지 않는다.
 
-소스·문서 검사기는 `.harness/check-*.sh`와 `.harness/check-comment-line-breaks.mjs`로 배포한다. 주석 훅은 프로젝트 `scripts/` 검사기를 우선하고, 없으면 공용 검사기를 사용한다. Git 인덱스 검사기의 lint-staged 연결 여부는 프로젝트가 정한다. 작성자 강제·프로젝트 병합 정책·React Doctor·Tailwind·admin 및 UI 컴포넌트 검사는 프로젝트 소유로 유지한다.
+소스·문서 검사기는 `.harness/check-*.sh`와 `.harness/check-comment-line-breaks.mjs`로 배포한다. 주석 훅은 프로젝트 `scripts/` 검사기를 우선하고, 없으면 공용 검사기를 사용한다. Git 인덱스 검사기의 lint-staged 연결 여부는 프로젝트가 정한다. 작성자 강제·프로젝트 병합 정책·React Doctor·admin 및 UI 컴포넌트 검사와 IntelliSense 린트 외의 Tailwind 규칙은 프로젝트 소유로 유지한다.
 
 
 ### 문장 사이 빈 줄 검사
@@ -141,6 +141,27 @@ code --install-extension /tmp/seungness-save-format.vsix
 
 회귀 검사는 `.harness/auto-format.test.mjs`와 `.harness/editor.test.mjs`다. `.harness/editor-host.cjs`는 별도 임시 프로필·작업 공간에서 VS Code의 `--extensionDevelopmentPath`·`--extensionTestsPath`로 실행하는 실제 저장 검증용이며 일반 Node 테스트에는 포함하지 않는다. 저장 API의 동작·제한은 [VS Code API](https://code.visualstudio.com/api/references/vscode-api#workspace.onWillSaveTextDocument)를 따른다.
 
+
+### Tailwind 린트 검사
+
+```bash
+node .harness/check-tailwind-lint.mjs --staged       # pre-commit·CI가 실행
+node .harness/check-tailwind-lint.mjs                # 추적 파일 전체 검사
+node .harness/check-tailwind-lint.mjs --write [파일]  # 표기 위반 수정 후 Biome가 있으면 해당 파일 포맷. Git 인덱스는 변경하지 않음
+```
+
+- Tailwind CSS IntelliSense(`@tailwindcss/language-service` 0.16.0)의 기본 린트 중 v4에서 동작하는 규칙을 커밋에서 차단한다. 새 패키지 없이 프로젝트에 설치된 Tailwind 디자인 시스템으로 판정하고, 첫 번째 진입 CSS의 `@theme`을 읽는다.
+  - JS·TS: `suggestCanonicalClasses`(자동 수정), `cssConflict`, `usedBlocklistedClass`
+  - CSS: `invalidTailwindDirective`, `invalidSourceDirective`, `deprecatedAtRule`, `invalidConfigPath`, `invalidScreen`
+  - `invalidApply`·`invalidVariant`·`recommendedVariantOrder`는 IntelliSense가 v4에서 검사하지 않아 제외한다.
+- IntelliSense는 `className` 등 클래스 속성만 보지만 이 검사는 JS·TS의 문자열 리터럴 전체를 클래스 목록으로 본다. 템플릿의 `${...}` 안은 별도 목록이다. 테스트 파일(`__tests__/`, `*.test.*`, `*.spec.*`)은 픽스처일 수 있어 제외한다.
+- px은 루트 16px 기준으로 rem 유틸리티로 바꾼다. 루트 글자 크기를 바꾼 프로젝트는 제외 규칙을 둔다.
+- `--staged`는 스테이징된 파일의 인덱스 내용을 읽는다. 변경하지 않은 파일의 기존 위반은 커밋을 막지 않지만, 고친 파일은 파일 안 기존 위반까지 함께 걸린다.
+- Tailwind 미설치·v3·진입 CSS 없음·API 없음·로드 실패는 사유를 출력하고 통과한다. `__unstable__loadDesignSystem`은 불안정한 API라 사라지면 이 검사는 실질적으로 꺼진다.
+- Claude·Codex 편집 후 자동 수정이 표기 위반을 고친다. 저장 시 수정은 약 1초 걸려 저장 훅의 1초 제한을 넘으므로 연결하지 않는다.
+- 같은 검사를 프로젝트 테스트로 중복 두지 않는다.
+
+회귀 검사는 `.harness/tailwind-lint.test.mjs`다. 실제 변환 검증은 `HARNESS_TEST_PROJECT=/설치된/프로젝트`로 실행한다.
 
 ## 공용 pre-commit·CI 계약
 

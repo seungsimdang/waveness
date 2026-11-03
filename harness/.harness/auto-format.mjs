@@ -3,6 +3,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatBuffer } from './biome-check.mjs';
+import { fixFiles } from './check-tailwind-lint.mjs';
 
 export function editedFiles(input) {
 	const args = input.tool_input ?? {};
@@ -24,13 +25,13 @@ export function editedFiles(input) {
 	return ['Edit', 'Write', 'MultiEdit'].includes(tool) && args.file_path ? [args.file_path] : [];
 }
 
+const failed = input =>
+	input.tool_response?.error ||
+	input.tool_response?.isError ||
+	input.tool_response?.success === false;
+
 export function autoFormat(input) {
-	if (
-		input.tool_response?.error ||
-		input.tool_response?.isError ||
-		input.tool_response?.success === false
-	)
-		return;
+	if (failed(input)) return;
 
 	const root = realpathSync(input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
 
@@ -64,9 +65,19 @@ export function autoFormat(input) {
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	try {
-		const changed = autoFormat(JSON.parse(readFileSync(0, 'utf8')));
+		const input = JSON.parse(readFileSync(0, 'utf8'));
 
-		if (changed?.length)
+		// 클래스가 짧아지면 줄바꿈 결과가 달라지므로 포맷보다 먼저 수정
+		const fixed = failed(input)
+			? []
+			: await fixFiles(
+					realpathSync(input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd()),
+					editedFiles(input)
+				);
+
+		const changed = [...new Set([...fixed, ...(autoFormat(input) ?? [])])];
+
+		if (changed.length)
 			console.log(
 				JSON.stringify({
 					hookSpecificOutput: {

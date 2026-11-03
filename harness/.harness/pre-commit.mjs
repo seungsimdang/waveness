@@ -103,12 +103,20 @@ export function checkPlan(root) {
 
 	if (!tests.length) throw new Error('공용 하네스 테스트 없음');
 
+	// 스테이징 파일만 보는 검사라 기존 위반이 있어도 변경하지 않은 파일은 차단하지 않음
+	const tailwind = existsSync(join(root, '.harness/check-tailwind-lint.mjs'))
+		? [['node', '.harness/check-tailwind-lint.mjs', '--staged']]
+		: [];
+
+	if (tailwind.length) stagedTasks.add(extras.length + lint.length);
+
 	return {
 		identity: config.identity,
 		stagedTasks,
 		tasks: [
 			...extras,
 			...lint,
+			...tailwind,
 			...commands(config.typecheck, 'typecheck'),
 			[process.execPath, '--test', ...tests]
 		]
