@@ -194,7 +194,10 @@ function finishPull(project, lock, head, steps) {
     copyFileSync(join(HUB, "templates/project.md"), rules);
     touched.push("docs/agent-rules/project.md");
   }
-  writeFileSync(join(project, ".harness/lock.json"), `${JSON.stringify({ ...lock, synced: head }, null, 2)}\n`);
+  // 프로젝트 포매터가 탭을 요구하는 경우가 있어 기존 lock 들여쓰기 보존
+  const lockFile = join(project, ".harness/lock.json");
+  const indent = existsSync(lockFile) && /\n\t/.test(readFileSync(lockFile, "utf8")) ? "\t" : 2;
+  writeFileSync(lockFile, `${JSON.stringify({ ...lock, synced: head }, null, indent)}\n`);
   touched.push(".harness/lock.json");
   return touched;
 }

@@ -183,6 +183,22 @@ test("충돌이 나면 격리 받기는 파일을 쓰지 않음", () => {
   }
 });
 
+test("받기는 기존 lock 파일의 탭 들여쓰기를 보존", () => {
+  const { root, hub, project } = setup();
+  try {
+    run(hub, "pull", project);
+    const lockFile = join(project, ".harness/lock.json");
+    writeFileSync(lockFile, `${JSON.stringify(JSON.parse(readFileSync(lockFile, "utf8")), null, "\t")}\n`);
+    writeFileSync(join(hub, "harness/CLAUDE.md"), "탭 보존 확인\n");
+    git(hub, "add", ".");
+    commit(hub, "docs: 범용");
+    run(hub, "pull", project);
+    assert.match(readFileSync(lockFile, "utf8"), /\n\t"synced": "[0-9a-f]{40}"/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("프로젝트 커밋이 실패하면 격리 받기는 받은 파일을 되돌려 다음 받기가 멈추지 않음", () => {
   const { root, hub, project } = setup();
   try {
