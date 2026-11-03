@@ -82,13 +82,13 @@ test('문자열 안 비정규 클래스만 바꾸고 나머지 코드는 보존'
 	};
 
 	const { fixed, changes } = canonicalizeText(
-		'const top = 1;\n<p className="flex top-[16px]" />;\ncn(\'!mx-0\', `a ${b} top-[16px]`);\n// top-[16px]\n',
+		`const top = 1;\n<p className="flex top-[16px]" />;\ncn('!mx-0', \`a \${b} top-[16px]\`);\n// top-[16px]\n`,
 		checker
 	);
 
 	assert.equal(
 		fixed,
-		'const top = 1;\n<p className="flex top-4" />;\ncn(\'mx-0!\', `a ${b} top-4`);\n// top-[16px]\n'
+		`const top = 1;\n<p className="flex top-4" />;\ncn('mx-0!', \`a \${b} top-4\`);\n// top-[16px]\n`
 	);
 	assert.equal(changes.length, 3);
 });
@@ -124,7 +124,7 @@ test('같은 목록의 같은 CSS 속성만 충돌로 판정하고 템플릿 분
 		'block: 같은 CSS 속성 적용 (hidden)'
 	]);
 	assert.deepEqual(lintClasses('cn("block md:block")', checker), []);
-	assert.deepEqual(lintClasses('`md:block ${on ? "block" : "hidden"}`', checker), []);
+	assert.deepEqual(lintClasses(`\`md:block \${on ? "block" : "hidden"}\``, checker), []);
 	assert.deepEqual(lintClasses('"w-4"', checker), ['w-4: 차단 목록의 클래스']);
 });
 
@@ -267,20 +267,16 @@ test('편집 후 수정은 프로젝트 안 소스 파일만 변경', () =>
 		}
 	}));
 
-test(
-	'실제 Tailwind에서 임의값을 canonical로 변환',
-	{
-		skip: existsSync(join(project, 'node_modules/tailwindcss/dist/lib.mjs'))
-			? false
-			: 'HARNESS_TEST_PROJECT에 Tailwind v4 없음'
-	},
-	async () => {
-		const checker = await loadChecker(project);
+test('실제 Tailwind에서 임의값을 canonical로 변환', {
+	skip: existsSync(join(project, 'node_modules/tailwindcss/dist/lib.mjs'))
+		? false
+		: 'HARNESS_TEST_PROJECT에 Tailwind v4 없음'
+}, async () => {
+	const checker = await loadChecker(project);
 
-		if (checker.skip) return;
+	if (checker.skip) return;
 
-		assert.equal(checker.canonical('min-w-[720px]').endsWith('[720px]'), false);
-		assert.equal(checker.canonical('text-[16px]'), 'text-[16px]');
-		assert.equal(checker.canonical('제목'), '제목');
-	}
-);
+	assert.equal(checker.canonical('min-w-[720px]').endsWith('[720px]'), false);
+	assert.equal(checker.canonical('text-[16px]'), 'text-[16px]');
+	assert.equal(checker.canonical('제목'), '제목');
+});

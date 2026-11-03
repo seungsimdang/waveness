@@ -275,7 +275,10 @@ export function lintStylesheet(source, checker) {
 	for (const match of sources) {
 		const { directive, source: raw } = match.groups;
 		const quoted = /^['"]|['"]$/.test(raw.trim());
-		const value = raw.trim().replace(/^['"]|['"]$/g, '').trim();
+		const value = raw
+			.trim()
+			.replace(/^['"]|['"]$/g, '')
+			.trim();
 
 		if (!value || value === ')' || value === ';') add(match.index, 'source 지시문에 경로 필요');
 		else if (directive !== 'source' && value !== 'none' && !quoted)
@@ -292,8 +295,7 @@ export function lintStylesheet(source, checker) {
 		add(match.index, '단문 @variant는 폐기 예정. @custom-variant 사용');
 
 	for (const match of text.matchAll(/(?:--)?\btheme\(\s*['"]?([^)'"\s,/]+)/g))
-		if (!checker.themeExists(match[1]))
-			add(match.index, `테마에 없는 값: ${match[1]}`);
+		if (!checker.themeExists(match[1])) add(match.index, `테마에 없는 값: ${match[1]}`);
 
 	for (const match of text.matchAll(/(?:\s|^)@screen\s+([^\s{]+)/g))
 		if (!checker.themeExists(`--breakpoint-${match[1]}`))
