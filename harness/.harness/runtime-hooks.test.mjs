@@ -342,7 +342,7 @@ for (const tool of ['.claude', '.codex']) {
 			for (const command of [
 				'gh pr merge 3 -R Org/manual-app --merge',
 				'gh api --method PUT repos/Org/manual-app/pulls/3/merge',
-				'for x in a:1; do gh pr merge ${x##*:} -R ${x%%:*} --merge; done'
+				`for x in a:1; do gh pr merge \${x##*:} -R \${x%%:*} --merge; done`
 			])
 				assert.equal(merge(command), 2, command);
 
