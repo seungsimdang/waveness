@@ -275,6 +275,7 @@ export function lintStylesheet(source, checker) {
 	for (const match of sources) {
 		const { directive, source: raw } = match.groups;
 		const quoted = /^['"]|['"]$/.test(raw.trim());
+
 		const value = raw
 			.trim()
 			.replace(/^['"]|['"]$/g, '')
@@ -405,6 +406,7 @@ export async function run(root, args) {
 		if (!shown && !existsSync(join(root, file))) continue;
 
 		const text = shown ? shown.stdout : readFileSync(join(root, file), 'utf8');
+
 		const { fixed, changes } = STYLE.test(file)
 			? { fixed: text, changes: [] }
 			: canonicalizeText(text, checker);
