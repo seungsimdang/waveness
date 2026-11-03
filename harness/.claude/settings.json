@@ -153,6 +153,15 @@
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-reask-after-free-text-answer.sh\""
 					}
 				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/usage_guard.py\" claude",
+						"timeout": 15
+					}
+				]
 			}
 		],
 		"PostToolUse": [
@@ -161,6 +170,11 @@
 					{
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-feasibility-verdict.sh\""
+					},
+					{
+						"type": "command",
+						"command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/usage_guard.py\" claude",
+						"timeout": 15
 					}
 				]
 			},
@@ -259,6 +273,17 @@
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/judge-unverified-claims.sh\"",
 						"timeout": 90
+					}
+				]
+			}
+		],
+		"PostToolUseFailure": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/usage_guard.py\" claude",
+						"timeout": 15
 					}
 				]
 			}

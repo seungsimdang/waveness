@@ -53,10 +53,10 @@ test('스킬은 .claude/skills와 .agents/skills의 파일 집합이 같음', ()
 test('훅 등록이 가리키는 파일이 모두 있음', () => {
 	const commands = [
 		...JSON.stringify(JSON.parse(read('.claude/settings.json')).hooks).matchAll(
-			/\.(?:claude|codex|harness)\/[\w/-]+\.(?:sh|mjs)/g
+			/\.(?:claude|codex|harness)\/[\w/-]+\.(?:sh|mjs|py)/g
 		),
 		...JSON.stringify(JSON.parse(read('.codex/hooks.json')).hooks).matchAll(
-			/\.(?:claude|codex|harness)\/[\w/-]+\.(?:sh|mjs)/g
+			/\.(?:claude|codex|harness)\/[\w/-]+\.(?:sh|mjs|py)/g
 		)
 	].map(([path]) => path);
 	assert.ok(commands.length > 0);
