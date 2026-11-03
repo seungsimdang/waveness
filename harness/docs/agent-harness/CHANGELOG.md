@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-11-03 chore(harness): 선례 조사 역할 effort 상향
+
+- Harness-Origin: `seojin-camshaft-monitoring-frontend@e449bdc228b22e89e95df2ba59fcf9ff36af156a`
+
+> - 선례 조사 역할(Claude·Codex판)의 추론 effort를 medium에서 high로 상향해 레퍼런스 근거 조사 깊이 보강
+
 ## 2026-11-03 manualMerge 저장소 병합 차단 훅 추가
 
 - 허브 등록에서 `manualMerge: true`로 지정한 저장소의 PR 병합을 Claude·Codex Bash에서 예외 없이 차단. 저장소를 변수로 넘겨 판정할 수 없는 병합도 차단
