@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop 훅(차단): 마지막 응답의 근거 없는 단정, 구체성 없는 확인 요청, 사용자 질문 미응답, 자기 행동 이유 질문에 원인 없이 경위만 답한 것을 LLM으로 판정해 턴 종료를 막음
+# Stop 훅(차단): 마지막 응답의 확인 미룸 표현을 정규식으로 턴마다 한 번 먼저 막고, 이어서 근거 없는 단정, 구체성 없는 확인 요청, 사용자 질문 미응답, 자기 행동 이유 질문에 원인 없이 경위만 답한 것을 LLM으로 판정해 턴 종료를 막음
 # type prompt 훅은 single-turn이라 도구 결과를 못 보고, stop_hook_active 재판정 지시를 판정 모델이 무시해 반복 차단한 사고가 있어 command 훅으로 감쌈
 # Stop은 if를 지원하지 않고 같은 이벤트 훅은 병렬 실행이라, 결정적 가드는 이 스크립트 안에서만 둘 수 있음
 # 가드는 stop_hook_active와 턴별 차단 횟수 상한이며, 플래그가 계속 false로 들어온 보고(anthropics/claude-code#54360)가 있어 횟수를 파일로도 셈
@@ -11,7 +11,7 @@
 
 input=$(cat)
 
-printf '%s' "$input" | MARK_DIR="${TMPDIR:-/tmp}/stop-judge" python3 -c '
+printf '%s' "$input" | DEFERRED_PATTERN_FILE="$(dirname "$0")/../../.harness/deferred-claims-pattern.txt" MARK_DIR="${TMPDIR:-/tmp}/stop-judge" python3 -c '
 import json, os, re, subprocess, sys
 
 MAX_BLOCKS = 2
@@ -84,6 +84,15 @@ for line in reversed(lines):
     attachment = entry.get("attachment") or {}
     if attachment.get("type") == "queued_command" and attachment.get("prompt"):
         prompts.append(str(attachment["prompt"])[-MAX_EVIDENCE_CHARS:])
+    # 질문 창 직접 입력은 tool_result로 기록되어 턴 시작 메시지 판별에 잡히지 않으므로 답변 원문을 질문 목록에 넣음
+    tool_result = entry.get("toolUseResult")
+    if isinstance(tool_result, dict) and isinstance(tool_result.get("answers"), dict):
+        for question in tool_result.get("questions") or []:
+            labels = {option.get("label") for option in question.get("options") or []}
+            value = tool_result["answers"].get(question.get("question"))
+            parts = value.split(", ") if value and question.get("multiSelect") else [value]
+            if value and not set(parts) <= labels:
+                prompts.append(str(value)[-MAX_EVIDENCE_CHARS:])
     content = (entry.get("message") or {}).get("content")
     if not isinstance(content, list):
         continue
@@ -107,6 +116,24 @@ except Exception:
 if blocks >= MAX_BLOCKS:
     sys.exit(0)
 
+# LLM은 미검증 표시를 정직한 보고로 보고 놓칠 수 있어 확인 미룸 표현은 정규식으로 먼저 판정
+# 코드 표기·큰따옴표·인용 줄은 규칙을 설명하는 문장일 수 있어 판정에서 뺌. 재응답은 다음 판정으로 넘김
+deferred_mark = mark + "-deferred"
+deferred_text = re.sub(r"`[^`]*`|\"[^\"\n]*\"|“[^”\n]*”|^>.*$", "", answer, flags=re.M)
+# 미룸 문구는 Claude·Codex 판정 훅이 함께 쓰는 파일에서 읽고, 읽지 못하면 이 판정만 건너뜀
+try:
+    with open(os.environ["DEFERRED_PATTERN_FILE"], encoding="utf-8") as pattern_file:
+        deferred_pattern = re.compile(pattern_file.read().strip())
+except Exception:
+    deferred_pattern = None
+if deferred_pattern and not os.path.exists(deferred_mark):
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", deferred_text):
+        if deferred_pattern.search(sentence):
+            os.makedirs(os.environ["MARK_DIR"], exist_ok=True)
+            open(deferred_mark, "w").close()
+            print(json.dumps({"decision": "block", "reason": "확인을 미룬 보고가 있습니다: " + sentence.strip()[:120] + " 지금 도구로 확인할 수 있으면 확인한 결과로 다시 보고하세요. 정말 확인할 수 없으면 막힌 이유와 확인 방법을 적으세요."}, ensure_ascii=False))
+            sys.exit(0)
+
 prompt = f"""너는 Claude Code 응답 검토기다. 아래 [마지막 응답]을 [이번 턴 도구 기록]과 대조해 판정하고 JSON 한 줄만 출력한다.
 
 차단 대상:
@@ -115,8 +142,9 @@ prompt = f"""너는 Claude Code 응답 검토기다. 아래 [마지막 응답]�
 3. 사용자에게 확인·조작을 요청하면서 전체 URL, 클릭·입력 순서, 알려 줄 값 중 하나라도 빠진 요청, 또는 코드·저장소·공개 문서처럼 도구로 직접 확인할 수 있는 것을 사용자에게 넘긴 요청
 4. [사용자 메시지](턴 시작 메시지와 작업 중에 보낸 메시지, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [마지막 응답]이 답하지 않은 것. 작업 지시는 질문이 아니다
 5. [사용자 메시지]가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답]이 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것
+6. 응답이 미검증, 확인하지 않음, 시험 전 확정 불가, 추측처럼 확인을 미룬 사항 중 저장소 파일 읽기, 명령 실행, 임시 사본 실험, 세션 기록 조회로 그 턴에 확인할 수 있었던 것. 미검증이나 추론이라고 표시했어도 면제되지 않는다
 
-차단하지 않는 것: 도구 기록이나 응답의 출처 표기로 뒷받침되는 주장, 이전 턴에서 확인했다고 출처를 밝힌 주장, 사용자가 준 자료에 근거한 주장, 확인할 수 없는 이유와 확인 방법을 밝힌 보고, 추론이라고 표시한 판단, 사용자가 고를 선택지 설명, 계획·진행 상황 보고, 일반 프로그래밍 개념 설명.
+차단하지 않는 것: 도구 기록이나 응답의 출처 표기로 뒷받침되는 주장, 이전 턴에서 확인했다고 출처를 밝힌 주장, 사용자가 준 자료에 근거한 주장, 시도한 명령의 실패, 권한 거부, 외부 시스템 미가동, 사람의 결정 필요처럼 실제로 막힌 이유와 확인 방법을 밝힌 보고, 근거를 대고 추론이라고 표시했으며 도구로 더 확인할 수 없는 판단, 사용자가 고를 선택지 설명, 계획·진행 상황 보고, 일반 프로그래밍 개념 설명.
 작업 완료 여부와 남은 단계는 판정하지 않는다. 확신이 없으면 통과시킨다.
 
 출력: 통과면 {{"ok": true}}, 차단이면 {{"ok": false, "reason": "<해당 문장 요약>: <무엇을 확인하거나 보완해 다시 답할지>"}}. reason은 한국어 두 문장 이내.
