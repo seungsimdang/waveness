@@ -83,6 +83,7 @@
 ## 고위험 행동 차단
 
 - **명시적 승인 없이 절대 금지**: `git commit`, `git push`, 파일 삭제
+  - 예외: 격리 subagent 스폰 직전에 자신의 작업 변경을 브랜치의 기존 작업 커밋에 `git commit --amend --no-edit`로 합치는 것과, 회수를 마친 subagent worktree 정리(`docs/agent-rules/git-safety.md` "subagent 격리와 결과 회수"). 작업 커밋 신규 생성·메시지 변경은 예외가 아님
 - 파괴적/비가역적 작업(rm, delete, reset --hard, push --force 등)은 사용자 승인 후만 실행
 
 ## 코드 스타일 핵심

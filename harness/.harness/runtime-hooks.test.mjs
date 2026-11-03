@@ -481,28 +481,36 @@ test('클로드 에이전트 실행 훅이 fork 스폰과 worktree 진입, 격�
 
 	try {
 		spawnSync('git', ['init', '-q'], { cwd: fixture, env });
+		const isolation = (subagent_type, isolationValue) =>
+			claude(
+				'require-isolation-when-dirty',
+				{ tool_input: { subagent_type, ...(isolationValue ? { isolation: isolationValue } : {}) } },
+				fixture
+			).status;
+
+		const agents = join(fixture, '.claude', 'agents');
+		mkdirSync(agents, { recursive: true });
+		writeFileSync(join(agents, 'implementer.md'), '---\nname: implementer\ntools: Read, Edit, Bash\n---\n');
+		writeFileSync(join(agents, 'reader.md'), '---\nname: reader\ntools: Read, Grep\n---\n');
+		writeFileSync(join(agents, 'inherits.md'), '---\nname: inherits\n---\n');
+		spawnSync('git', ['add', '-A'], { cwd: fixture, env });
+		spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init'], { cwd: fixture, env });
+
+		// 쓰기 가능 역할(정의 tools, tools 없음, 이름 미상 내장)은 깨끗한 트리에서도 격리 없이 차단
+		for (const type of ['implementer', 'inherits', 'general-purpose', undefined]) {
+			assert.equal(isolation(type), 2);
+			assert.equal(isolation(type, 'worktree'), 0);
+		}
+
+		// 다른 subagent가 남긴 worktree 폴더는 dirty로 보지 않음
+		mkdirSync(join(fixture, '.claude', 'worktrees', 'agent-x'), { recursive: true });
+		writeFileSync(join(fixture, '.claude', 'worktrees', 'agent-x', 'probe.txt'), 'x');
+		assert.equal(isolation('implementer', 'worktree'), 0);
+
+		// 미커밋 변경이 있으면 쓰기 가능 역할은 격리 스폰도 차단, 읽기 전용 역할은 격리 없이 통과
 		writeFileSync(join(fixture, 'dirty.txt'), 'changed');
-		assert.equal(
-			claude(
-				'require-isolation-when-dirty',
-				{ tool_input: { subagent_type: 'frontend-developer' } },
-				fixture
-			).status,
-			2
-		);
-		assert.equal(
-			claude(
-				'require-isolation-when-dirty',
-				{
-					tool_input: {
-						subagent_type: 'frontend-developer',
-						isolation: 'worktree'
-					}
-				},
-				fixture
-			).status,
-			0
-		);
+		assert.equal(isolation('implementer', 'worktree'), 2);
+		for (const type of ['reader', 'Explore', 'web-fetch']) assert.equal(isolation(type), 0);
 	} finally {
 		rmSync(fixture, { recursive: true, force: true });
 	}
