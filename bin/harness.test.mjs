@@ -529,6 +529,15 @@ test("seungness 훅 동기화는 훅 등록을 항목 단위로 주고받고 전
     commit(up, "chore: c 등록 해제");
     sync();
     assert.deepEqual(JSON.parse(read(hub, file)).hooks.PreToolUse[0].hooks, [hookCommand("a.sh"), hookCommand("only.sh")]);
+
+    // 공유 경로 밖 .harness 스크립트 등록은 받지 않음
+    const guard = { type: "command", command: 'python3 "$CLAUDE_PROJECT_DIR/.harness/usage_guard.py" claude' };
+    edit(up, (hooks) => hooks.PreToolUse[0].hooks.push(guard));
+    git(up, "add", ".");
+    commit(up, "feat: 사용량 훅 등록");
+    sync();
+    assert.deepEqual(JSON.parse(read(hub, file)).hooks.PreToolUse[0].hooks, [hookCommand("a.sh"), hookCommand("only.sh")]);
+    assert.deepEqual(JSON.parse(read(up, file)).hooks.PreToolUse[0].hooks, [hookCommand("a.sh"), guard]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

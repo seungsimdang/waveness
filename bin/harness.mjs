@@ -343,6 +343,8 @@ const HOOK_CONFIGS = [".claude/settings.json", ".codex/hooks.json"];
 const hookPaths = (command = "") => [
   ...[...command.matchAll(/\.(?:claude|codex)\/hooks\/[\w.-]+\.(?:sh|mjs)/g)].map(([path]) => path),
   ...[...command.matchAll(/codex-tool-adapter\.mjs"?\s+([\w-]+)/g)].map(([, name]) => `.codex/hooks/${name}.sh`),
+  // hooks 폴더 밖 스크립트(.harness/*.py 등)도 공유 판정 대상, 경로를 못 뽑은 등록이 공유로 분류되지 않게 함
+  ...[...command.matchAll(/\.harness\/[\w.-]+/g)].map(([path]) => path),
 ];
 
 const registrationKey = (event, matcher, hook) => JSON.stringify([event, matcher ?? null, hook]);
