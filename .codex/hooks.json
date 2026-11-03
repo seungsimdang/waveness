@@ -79,6 +79,15 @@
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/codex-tool-adapter.mjs\" block-comment-line-wrap"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.harness/usage_guard.py\" codex",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -87,6 +96,11 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/require-feasibility-verdict.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.harness/usage_guard.py\" codex",
+            "timeout": 15
           }
         ]
       },
@@ -172,6 +186,39 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/block-unverified-claims.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.harness/usage_guard.py\" codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.harness/usage_guard.py\" codex",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.harness/usage_guard.py\" codex",
+            "timeout": 15
           }
         ]
       }
