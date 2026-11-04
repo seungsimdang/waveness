@@ -1,5 +1,16 @@
 # 하네스 변경 이력
 
+## 2026-11-04 chore(harness): 선언한 다음 단계 미실행 차단 훅 추가와 feature-team 검증 절차 보완
+
+- Harness-Origin: `seojin-camshaft-monitoring-frontend@8173a4860519b839e88623e3346fc24b013eb380`
+
+> - 마지막 문단의 대기 조건 없는 실행 서술을 1회 차단하는 Stop 훅 추가(Claude·Codex)
+> - 재질문 훅에 stop 모드 추가, 차단이 풀렸는데 질문을 다음 메시지로 미루는 응답 1회 차단
+> - integration-reviewer 보고서에 Figma와 다름 칸, 페이지별 스크린샷 대조, 범위 밖 조건 렌더링 추가와 수정 요청은 Orchestrator에게만 전달
+> - implementer 소스 수정은 Orchestrator 지시로만 하고 파일 삭제 전 알림
+> - orchestrator 진행표에 결정 질문 근거로 화면 스크린샷 변형 확인, 재검증 시 페이지별 대조, TaskStop 후 재개 처리 추가
+> - 신규·변경 훅 등록과 판정 회귀 테스트 추가
+
 ## 2026-11-04 chore(harness): 결정 질문 질문 창 강제 훅 추가
 
 - Harness-Origin: `seojin-camshaft-monitoring-frontend@9af437661db3143c71279e2ec37d3f2b0bb42ffb`

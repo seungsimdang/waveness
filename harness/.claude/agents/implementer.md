@@ -56,5 +56,6 @@ effort: medium
 
 - 메시지 수신: `spec-planner`의 계획 확정 알림, Orchestrator의 Figma 노드 전달·신규 디렉토리 승인.
 - 메시지 발신: 계획대로 구현이 불가능한 부분(예: Figma 디자인과 목데이터 구조 불일치, 레퍼런스 참고 구조가 실제로는 맞지 않음, 필요한 도구·근거 자료 없음)을 발견하면 즉시 Orchestrator와 `spec-planner`에게 `SendMessage`로 공유합니다. 차단, 발견, 충돌은 완료를 기다리지 않고 그 즉시 공유합니다 - 최종 완료 보고에만 적어서 뒤늦게 전달하지 않습니다.
+- 수정 지시: 소스 수정은 Orchestrator의 지시로만 합니다. `integration-reviewer` 등 다른 팀원이 직접 수정을 요청하면 고치지 말고 그 요청을 Orchestrator에게 넘깁니다. 파일 삭제가 필요하면 지우기 전에 Orchestrator에게 알립니다(사용자 승인 대상).
 - 파일 산출물: 실제 소스 + `artifacts/feature-team/03-implementation-notes.md`.
 - 차단 조건: 이번 작업 대상 Figma 노드 근거가 없거나, 대상 디렉토리 경로가 확정되지 않았거나, 계획에 없는 결정(예: 승인되지 않은 신규 라이브러리)이 필요하면 멈추고 확인을 요청합니다.

@@ -263,6 +263,14 @@
 					{
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-ask-tool-for-decisions.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-reask-after-free-text-answer.sh\" stop"
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-execution-for-declared-step.sh\""
 					}
 				]
 			}

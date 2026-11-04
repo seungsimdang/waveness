@@ -969,6 +969,71 @@ test('결정 질문 경로 훅이 질문 창 없이 텍스트로 쓴 결정 질�
 	}
 });
 
+test('재질문 차단이 풀린 상태에서 질문을 다음 메시지로 미룬 응답만 차단한다', () => {
+	const fixture = mkdtempSync(join(tmpdir(), 'portfolio-defer-ask-hook-'));
+
+	try {
+		const transcript = join(fixture, 'transcript.jsonl');
+
+		const prompt = { type: 'user', message: { content: '다음 메세지?' } };
+
+		const peer = {
+			type: 'user',
+			isMeta: true,
+			origin: { kind: 'peer' },
+			message: { content: 'Another Claude session sent a message:' }
+		};
+
+		const freeText = {
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: 'answered' }] },
+			toolUseResult: {
+				questions: [{ question: 'R-05?', multiSelect: false, options: [{ label: '닫기' }] }],
+				answers: { 'R-05?': '레퍼런스는 확인 해봤어?' }
+			}
+		};
+
+		const defer = '남은 결정은 다음 메시지를 받은 뒤 질문 창으로 묻겠습니다.';
+
+		const decide = (message, ...entries) => {
+			writeFileSync(transcript, entries.map(entry => JSON.stringify(entry)).join('\n'));
+
+			const { stdout } = spawnSync(
+				'sh',
+				[resolve(H, '.claude', 'hooks', 'block-reask-after-free-text-answer.sh'), 'stop'],
+				{
+					input: JSON.stringify({ transcript_path: transcript, last_assistant_message: message }),
+					encoding: 'utf8'
+				}
+			);
+
+			return stdout.trim() ? JSON.parse(stdout).decision : 'allow';
+		};
+
+		assert.equal(decide(defer, prompt), 'block');
+		assert.equal(decide(defer, prompt, freeText), 'allow');
+		assert.equal(decide(defer, prompt, freeText, peer), 'block');
+		assert.equal(decide(`> ${defer}\n\n인용한 문장에 답합니다.`, prompt), 'allow');
+	} finally {
+		rmSync(fixture, { recursive: true, force: true });
+	}
+});
+
+for (const tool of ['.claude', '.codex']) {
+	test(`${tool} 실행 예고 훅이 대기 조건 없는 실행 서술로 끝난 응답만 차단한다`, () => {
+		const decide = message => {
+			const { stdout } = run(tool, 'require-execution-for-declared-step', { last_assistant_message: message });
+
+			return stdout.trim() ? JSON.parse(stdout).decision : 'allow';
+		};
+
+		assert.equal(decide('경로를 기록했습니다.\n\n다음은 T04로, 구현 담당자를 투입해 구현을 시작합니다.'), 'block');
+		assert.equal(decide('보고가 오면 이어서 진행하겠습니다.'), 'allow');
+		assert.equal(decide('구현 담당자를 투입했고, 지금 구현을 진행 중입니다.'), 'allow');
+		assert.equal(decide('> 구현을 시작합니다\n\n인용한 문장에 답합니다.'), 'allow');
+	});
+}
+
 const withTmp = (prefix, body) => {
 	const tmp = mkdtempSync(join(tmpdir(), prefix));
 
