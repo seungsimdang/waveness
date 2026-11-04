@@ -19,6 +19,9 @@ MAX_RESULT_CHARS = 1500
 MAX_MATCH_CHARS = 3000
 MAX_LINE_CHARS = 400
 MAX_EVIDENCE_CHARS = 24000
+MAX_TURN_TEXT_CHARS = 6000
+# 앞선 턴에서 확인한 근거를 인용한 주장을 근거 없음으로 오판하지 않도록, 이번 턴 포함 최근 3개 사용자 턴의 도구 기록을 모음(전체는 MAX_EVIDENCE_CHARS 안에서 최신 쪽 우선)
+EVIDENCE_TURNS = 3
 JUDGE_TIMEOUT_SECONDS = 60
 
 try:
@@ -62,10 +65,12 @@ def block_text(block):
     matched = "\n".join(hits)[:MAX_MATCH_CHARS]
     return text[:MAX_RESULT_CHARS] + ("\n[...중략. 이후 줄 중 응답이 인용한 이름이 든 줄...]\n" + matched if matched else "\n[...이후 생략...]")
 
-# transcript를 끝에서부터 읽어 마지막 실제 사용자 메시지 이후의 도구 호출과 결과만 모음
+# transcript를 끝에서부터 읽어 최근 EVIDENCE_TURNS개 사용자 턴의 도구 호출·결과와, 이번 턴 assistant 텍스트를 모음
 turn_id = "unknown"
 prompts = []
 evidence = []
+turn_texts = []
+turns_seen = 0
 try:
     with open(data.get("transcript_path") or "", encoding="utf-8") as transcript:
         lines = transcript.readlines()
@@ -77,16 +82,22 @@ for line in reversed(lines):
     except Exception:
         continue
     if is_user_prompt(entry):
-        turn_id = entry.get("uuid") or turn_id
-        prompts.append(prompt_text(entry))
-        break
+        # 앞선 턴의 사용자 메시지는 미응답 판정 대상이 아니라 prompts에 넣지 않음
+        if turns_seen == 0:
+            turn_id = entry.get("uuid") or turn_id
+            prompts.append(prompt_text(entry))
+        turns_seen += 1
+        if turns_seen >= EVIDENCE_TURNS:
+            break
+        evidence.append("[--- 이전 사용자 턴 경계 ---]")
+        continue
     # 작업 중에 보낸 사용자 메시지는 queued_command 첨부로 남음
     attachment = entry.get("attachment") or {}
-    if attachment.get("type") == "queued_command" and attachment.get("prompt"):
+    if turns_seen == 0 and attachment.get("type") == "queued_command" and attachment.get("prompt"):
         prompts.append(str(attachment["prompt"])[-MAX_EVIDENCE_CHARS:])
     # 질문 창 직접 입력은 tool_result로 기록되어 턴 시작 메시지 판별에 잡히지 않으므로 답변 원문을 질문 목록에 넣음
     tool_result = entry.get("toolUseResult")
-    if isinstance(tool_result, dict) and isinstance(tool_result.get("answers"), dict):
+    if turns_seen == 0 and isinstance(tool_result, dict) and isinstance(tool_result.get("answers"), dict):
         for question in tool_result.get("questions") or []:
             labels = {option.get("label") for option in question.get("options") or []}
             value = tool_result["answers"].get(question.get("question"))
@@ -99,12 +110,19 @@ for line in reversed(lines):
     for block in reversed(content):
         if not isinstance(block, dict):
             continue
-        if block.get("type") == "tool_use":
+        if turns_seen == 0 and entry.get("type") == "assistant" and block.get("type") == "text":
+            turn_texts.append(block.get("text", ""))
+        elif block.get("type") == "tool_use":
             evidence.append("[도구 호출] " + json.dumps(block.get("input"), ensure_ascii=False)[:MAX_RESULT_CHARS])
         elif block.get("type") == "tool_result":
             evidence.append("[도구 결과] " + block_text(block))
 user_prompt = "\n---\n".join(reversed(prompts)) or "(찾지 못함)"
-evidence_text = "\n".join(reversed(evidence))[-MAX_EVIDENCE_CHARS:] or "(이번 턴 도구 실행 없음)"
+evidence_text = "\n".join(reversed(evidence))[-MAX_EVIDENCE_CHARS:] or "(최근 도구 실행 없음)"
+# 질문 창 직전 등 마지막 응답 이전에 쓴 설명도 질문 응답 여부 판정에 쓰도록 이번 턴 텍스트를 넘김. 마지막 응답과 겹치는 끝부분은 제외
+turn_text = "\n".join(reversed(turn_texts)).rstrip()
+if turn_text.endswith(answer.strip()):
+    turn_text = turn_text[: -len(answer.strip())]
+turn_text = turn_text.strip()[-MAX_TURN_TEXT_CHARS:] or "(없음)"
 
 session = re.sub(r"[^\w.-]", "_", str(data.get("session_id") or "default"))
 mark = os.path.join(os.environ["MARK_DIR"], session + "-" + re.sub(r"[^\w.-]", "_", turn_id))
@@ -134,17 +152,18 @@ if deferred_pattern and not os.path.exists(deferred_mark):
             print(json.dumps({"decision": "block", "reason": "확인을 미룬 보고가 있습니다: " + sentence.strip()[:120] + " 지금 도구로 확인할 수 있으면 확인한 결과로 다시 보고하세요. 정말 확인할 수 없으면 막힌 이유와 확인 방법을 적으세요."}, ensure_ascii=False))
             sys.exit(0)
 
-prompt = f"""너는 Claude Code 응답 검토기다. 아래 [마지막 응답]을 [이번 턴 도구 기록]과 대조해 판정하고 JSON 한 줄만 출력한다.
+prompt = f"""너는 Claude Code 응답 검토기다. 아래 [마지막 응답]을 [최근 도구 기록]과 대조해 판정하고 JSON 한 줄만 출력한다.
 
 차단 대상:
 1. 응답 스스로 일반 지식·추측·미확인·미검증이라고 밝히면서 단정하거나 사용자에게 따르라고 안내한 주장
-2. 외부 서비스·라이브러리·도구·공식 문서·저장소·배포·환경의 현재 상태에 대한 구체적 단정(버전, 기본값, 메뉴 이름, 자동 동작, 배포 상태 등) 중 [이번 턴 도구 기록]에도 응답에 적힌 출처(실행한 명령, 읽은 파일, 인용 문서)에도 근거가 없는 것
+2. 외부 서비스·라이브러리·도구·공식 문서·저장소·배포·환경의 현재 상태에 대한 구체적 단정(버전, 기본값, 메뉴 이름, 자동 동작, 배포 상태 등) 중 [최근 도구 기록]에도 응답에 적힌 출처(실행한 명령, 읽은 파일, 인용 문서)에도 근거가 없는 것
 3. 사용자에게 확인·조작을 요청하면서 전체 URL, 클릭·입력 순서, 알려 줄 값 중 하나라도 빠진 요청, 또는 코드·저장소·공개 문서처럼 도구로 직접 확인할 수 있는 것을 사용자에게 넘긴 요청
-4. [사용자 메시지](턴 시작 메시지와 작업 중에 보낸 메시지, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [마지막 응답]이 답하지 않은 것. 작업 지시는 질문이 아니다
-5. [사용자 메시지]가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답]이 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것
+4. [사용자 메시지](턴 시작 메시지와 작업 중에 보낸 메시지, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [마지막 응답 이전의 이번 턴 텍스트]와 [마지막 응답] 어디에서도 답하지 않은 것. 작업 지시는 질문이 아니다
+5. [사용자 메시지]가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답 이전의 이번 턴 텍스트]와 [마지막 응답]이 모두 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것
 6. 응답이 미검증, 확인하지 않음, 시험 전 확정 불가, 추측처럼 확인을 미룬 사항 중 저장소 파일 읽기, 명령 실행, 임시 사본 실험, 세션 기록 조회로 그 턴에 확인할 수 있었던 것. 미검증이나 추론이라고 표시했어도 면제되지 않는다
 
 차단하지 않는 것: 도구 기록이나 응답의 출처 표기로 뒷받침되는 주장, 이전 턴에서 확인했다고 출처를 밝힌 주장, 사용자가 준 자료에 근거한 주장, 시도한 명령의 실패, 권한 거부, 외부 시스템 미가동, 사람의 결정 필요처럼 실제로 막힌 이유와 확인 방법을 밝힌 보고, 근거를 대고 추론이라고 표시했으며 도구로 더 확인할 수 없는 판단, 사용자가 고를 선택지 설명, 계획·진행 상황 보고, 일반 프로그래밍 개념 설명.
+[사용자 메시지]·[최근 도구 기록]에 없는 세션 스냅샷·시스템 정보·기억을 반박 근거로 쓰지 않는다.
 작업 완료 여부와 남은 단계는 판정하지 않는다. 확신이 없으면 통과시킨다.
 
 출력: 통과면 {{"ok": true}}, 차단이면 {{"ok": false, "reason": "<해당 문장 요약>: <무엇을 확인하거나 보완해 다시 답할지>"}}. reason은 한국어 두 문장 이내.
@@ -152,8 +171,11 @@ prompt = f"""너는 Claude Code 응답 검토기다. 아래 [마지막 응답]�
 [사용자 메시지]
 {user_prompt}
 
-[이번 턴 도구 기록]
+[최근 도구 기록](이번 턴과 직전 사용자 턴들, 경계 표시로 구분)
 {evidence_text}
+
+[마지막 응답 이전의 이번 턴 텍스트]
+{turn_text}
 
 [마지막 응답]
 {answer}
