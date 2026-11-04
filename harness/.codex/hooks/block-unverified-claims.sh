@@ -59,15 +59,42 @@ for sentence in re.split(r"(?<=[.!?])\s+|\n", text):
 if why_prompt is None:
     sys.exit(0)
 
+MAX_TURN_TEXT_CHARS = 6000
+
+# 질문 창 직전 등 마지막 응답 이전에 쓴 설명도 원인 판정에 쓰도록, transcript에서 이번 턴 assistant 텍스트를 모음(형식은 require-korean-response.sh와 같은 해석). 못 읽으면 마지막 응답만으로 판정
+turn_texts = []
+try:
+    entries = [json.loads(line) for line in open(data.get("transcript_path") or "", encoding="utf-8") if line.strip()]
+except Exception:
+    entries = []
+start = 0
+for index, entry in enumerate(entries):
+    content = (entry.get("message") or {}).get("content") if isinstance(entry, dict) else None
+    if entry.get("type") == "user" and (isinstance(content, str) or (isinstance(content, list) and any(isinstance(c, dict) and c.get("type") == "text" for c in content))):
+        start = index + 1
+for entry in entries[start:]:
+    if entry.get("type") != "assistant":
+        continue
+    for c in (entry.get("message") or {}).get("content") or []:
+        if isinstance(c, dict) and c.get("type") == "text":
+            turn_texts.append(c.get("text", ""))
+turn_text = "\n".join(turn_texts).rstrip()
+if turn_text.endswith(answer.strip()):
+    turn_text = turn_text[: -len(answer.strip())]
+turn_text = turn_text.strip()[-MAX_TURN_TEXT_CHARS:] or "(없음)"
+
 prompt = f"""너는 Codex 응답 검토기다. 아래 [마지막 응답]을 판정하고 JSON 한 줄만 출력한다. 명령을 실행하거나 파일을 읽지 않는다.
 
-차단 대상: [사용자 메시지]가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답]이 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것.
+차단 대상: [사용자 메시지]가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답 이전의 이번 턴 텍스트]와 [마지막 응답]이 모두 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것.
 차단하지 않는 것: 코드·도구·외부 동작의 이유를 묻는 질문, 원인을 밝힌 답, "왜"가 질문이 아닌 메시지. 확신이 없으면 통과시킨다.
 
 출력: 통과면 {{"ok": true}}, 차단이면 {{"ok": false, "reason": "<해당 문장 요약>: <무엇을 보완해 다시 답할지>"}}. reason은 한국어 두 문장 이내.
 
 [사용자 메시지]
 {why_prompt}
+
+[마지막 응답 이전의 이번 턴 텍스트]
+{turn_text}
 
 [마지막 응답]
 {answer}

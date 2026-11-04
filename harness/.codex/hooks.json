@@ -176,6 +176,10 @@
 					{
 						"type": "command",
 						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-unverified-claims.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-execution-for-declared-step.sh\""
 					}
 				]
 			}

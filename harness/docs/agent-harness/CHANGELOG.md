@@ -1,5 +1,34 @@
 # 하네스 변경 이력
 
+## 2026-11-04 chore(harness): Stop 훅 오탐 수정(기획서 인용 판정, 미확인 단정 판정)
+
+- Harness-Origin: `seojin-camshaft-monitoring-frontend@bd2fa7d9d29b5dd6d000c85f89b65fd47c683447`
+
+> - 기획서 인용 훅의 줄번호 인용을 대소문자 무관으로 통과시키고, 코드 펜스 안의 줄과 백틱·큰따옴표 인용 안에서만 언급한 줄은 판정에서 제외
+> - 미확인 단정 판정 훅에 이번 턴의 앞선 텍스트(6,000자 상한)와 직전 3개 사용자 턴 도구 기록(기존 24,000자 상한 유지)을 넘기고, 앞선 턴 사용자 메시지는 미응답 판정에서 제외
+> - 판정 지시에 도구 기록·사용자 메시지에 없는 세션 정보를 반박 근거로 쓰지 않는 규칙 추가
+> - Codex 원인 판정 훅에도 이번 턴의 앞선 텍스트를 넘겨 질문 창 직전 설명을 판정에 반영
+> - 세 훅의 오탐 회귀 테스트 추가
+
+## 2026-11-04 chore(harness): 선언한 다음 단계 미실행 차단 훅 추가와 feature-team 검증 절차 보완
+
+- Harness-Origin: `seojin-camshaft-monitoring-frontend@8173a4860519b839e88623e3346fc24b013eb380`
+
+> - 마지막 문단의 대기 조건 없는 실행 서술을 1회 차단하는 Stop 훅 추가(Claude·Codex)
+> - 재질문 훅에 stop 모드 추가, 차단이 풀렸는데 질문을 다음 메시지로 미루는 응답 1회 차단
+> - integration-reviewer 보고서에 Figma와 다름 칸, 페이지별 스크린샷 대조, 범위 밖 조건 렌더링 추가와 수정 요청은 Orchestrator에게만 전달
+> - implementer 소스 수정은 Orchestrator 지시로만 하고 파일 삭제 전 알림
+> - orchestrator 진행표에 결정 질문 근거로 화면 스크린샷 변형 확인, 재검증 시 페이지별 대조, TaskStop 후 재개 처리 추가
+> - 신규·변경 훅 등록과 판정 회귀 테스트 추가
+
+## 2026-11-04 chore(harness): 결정 질문 질문 창 강제 훅 추가
+
+- Harness-Origin: `seojin-camshaft-monitoring-frontend@9af437661db3143c71279e2ec37d3f2b0bb42ffb`
+
+> - 질문 창 답변 없이 결정 요청 질문을 텍스트로 쓴 응답을 1회 차단하는 Stop 훅 추가, 재질문 훅에 막힌 호출은 질문 창 사용으로 세지 않음
+> - 직접 입력 답변 판정은 재질문 훅 단독 책임으로 두고, 재질문 훅 안내에 같은 응답의 텍스트 결정 질문 금지 문구 추가
+> - 신규 훅 Stop 등록과 판정 회귀 테스트 추가
+
 ## 2026-11-03 fix(harness): 쓰기 가능 subagent 격리 강제와 격리 결과 회수 절차 추가
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@5d5c085df47612bc393fbd9482823b75971d9bd7`

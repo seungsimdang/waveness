@@ -924,6 +924,116 @@ test('AskUserQuestion 직접 입력 답변 뒤 같은 응답의 재질문을 차
 	}
 });
 
+test('결정 질문 경로 훅이 질문 창 없이 텍스트로 쓴 결정 질문만 차단한다', () => {
+	const fixture = mkdtempSync(join(tmpdir(), 'portfolio-ask-tool-hook-'));
+
+	try {
+		const transcript = join(fixture, 'transcript.jsonl');
+
+		const prompt = { type: 'user', message: { content: '이어서 해' } };
+
+		const answered = {
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: 'answered' }] },
+			toolUseResult: { questions: [], answers: { 'D-01?': '확대 없음' } }
+		};
+
+		const denied = {
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: 'hook error', is_error: true }] },
+			toolUseResult: 'Error: PreToolUse:AskUserQuestion hook error'
+		};
+
+		const decide = (message, ...entries) => {
+			writeFileSync(transcript, entries.map(entry => JSON.stringify(entry)).join('\n'));
+
+			const { stdout } = run('.claude', 'require-ask-tool-for-decisions', {
+				transcript_path: transcript,
+				last_assistant_message: message
+			});
+
+			return stdout.trim() ? JSON.parse(stdout).decision : 'allow';
+		};
+
+		const question = 'D-13은 기획서와 Figma 중 어느 쪽으로 할까요?';
+
+		assert.equal(decide(question, prompt), 'block');
+		assert.equal(decide('남은 결정을 정해 주세요.', prompt), 'block');
+		assert.equal(decide(question, prompt, answered), 'allow');
+		assert.equal(decide(question, prompt, denied), 'block');
+		assert.equal(decide(question, answered, prompt), 'block');
+		assert.equal(decide('남은 결정은 다음 메시지 후 질문 창으로 여쭙겠습니다.', prompt), 'allow');
+		assert.equal(decide('> 어느 쪽으로 할까요?\n\n인용한 질문에 답합니다.', prompt), 'allow');
+	} finally {
+		rmSync(fixture, { recursive: true, force: true });
+	}
+});
+
+test('재질문 차단이 풀린 상태에서 질문을 다음 메시지로 미룬 응답만 차단한다', () => {
+	const fixture = mkdtempSync(join(tmpdir(), 'portfolio-defer-ask-hook-'));
+
+	try {
+		const transcript = join(fixture, 'transcript.jsonl');
+
+		const prompt = { type: 'user', message: { content: '다음 메세지?' } };
+
+		const peer = {
+			type: 'user',
+			isMeta: true,
+			origin: { kind: 'peer' },
+			message: { content: 'Another Claude session sent a message:' }
+		};
+
+		const freeText = {
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: 'answered' }] },
+			toolUseResult: {
+				questions: [{ question: 'R-05?', multiSelect: false, options: [{ label: '닫기' }] }],
+				answers: { 'R-05?': '레퍼런스는 확인 해봤어?' }
+			}
+		};
+
+		const defer = '남은 결정은 다음 메시지를 받은 뒤 질문 창으로 묻겠습니다.';
+
+		const decide = (message, ...entries) => {
+			writeFileSync(transcript, entries.map(entry => JSON.stringify(entry)).join('\n'));
+
+			const { stdout } = spawnSync(
+				'sh',
+				[resolve(H, '.claude', 'hooks', 'block-reask-after-free-text-answer.sh'), 'stop'],
+				{
+					input: JSON.stringify({ transcript_path: transcript, last_assistant_message: message }),
+					encoding: 'utf8'
+				}
+			);
+
+			return stdout.trim() ? JSON.parse(stdout).decision : 'allow';
+		};
+
+		assert.equal(decide(defer, prompt), 'block');
+		assert.equal(decide(defer, prompt, freeText), 'allow');
+		assert.equal(decide(defer, prompt, freeText, peer), 'block');
+		assert.equal(decide(`> ${defer}\n\n인용한 문장에 답합니다.`, prompt), 'allow');
+	} finally {
+		rmSync(fixture, { recursive: true, force: true });
+	}
+});
+
+for (const tool of ['.claude', '.codex']) {
+	test(`${tool} 실행 예고 훅이 대기 조건 없는 실행 서술로 끝난 응답만 차단한다`, () => {
+		const decide = message => {
+			const { stdout } = run(tool, 'require-execution-for-declared-step', { last_assistant_message: message });
+
+			return stdout.trim() ? JSON.parse(stdout).decision : 'allow';
+		};
+
+		assert.equal(decide('경로를 기록했습니다.\n\n다음은 T04로, 구현 담당자를 투입해 구현을 시작합니다.'), 'block');
+		assert.equal(decide('보고가 오면 이어서 진행하겠습니다.'), 'allow');
+		assert.equal(decide('구현 담당자를 투입했고, 지금 구현을 진행 중입니다.'), 'allow');
+		assert.equal(decide('> 구현을 시작합니다\n\n인용한 문장에 답합니다.'), 'allow');
+	});
+}
+
 const withTmp = (prefix, body) => {
 	const tmp = mkdtempSync(join(tmpdir(), prefix));
 
@@ -1002,3 +1112,106 @@ for (const tool of ['.claude', '.codex']) {
 		});
 	});
 }
+
+// Claude 형식 transcript: 앞선 턴(도구 기록 A) → 이번 턴 사용자 질문 → 질문 창 직전 설명 텍스트 → 마지막 응답
+const writeTranscript = tmp => {
+	const path = join(tmp, 'transcript.jsonl');
+	const entries = [
+		{ type: 'user', uuid: 'u1', message: { content: '앞선 턴 지시' } },
+		{ type: 'assistant', message: { content: [{ type: 'tool_use', input: { command: 'git log -1 --format=%B OLDCOMMIT' } }] } },
+		{ type: 'user', message: { content: [{ type: 'tool_result', content: '앞선 턴 결과 PREVIOUS-EVIDENCE' }] } },
+		{ type: 'user', uuid: 'u2', message: { content: '왜 남겨둔거임?' } },
+		{ type: 'assistant', message: { content: [{ type: 'text', text: '남겨 둔 이유는 EARLIER-REASON 입니다.' }] } },
+		{ type: 'assistant', message: { content: [{ type: 'text', text: '보관했습니다.' }] } }
+	];
+
+	writeFileSync(path, `${entries.map(entry => JSON.stringify(entry)).join('\n')}\n`);
+
+	return path;
+};
+
+test('클로드 미확인 판정 훅이 이번 턴 앞선 텍스트와 직전 턴 도구 기록을 판정기에 넘긴다', () => {
+	withTmp('portfolio-judge-', tmp => {
+		const captured = join(tmp, 'prompt.txt');
+		const judgeBin = join(tmp, 'judge.sh');
+
+		writeFileSync(judgeBin, `#!/bin/sh\ncat >"${captured}"\necho '{"ok": true}'\n`);
+		chmodSync(judgeBin, 0o755);
+
+		const result = spawnSync('sh', [resolve(H, '.claude/hooks/judge-unverified-claims.sh')], {
+			input: JSON.stringify({
+				session_id: 's1',
+				transcript_path: writeTranscript(tmp),
+				last_assistant_message: '보관했습니다.'
+			}),
+			encoding: 'utf8',
+			cwd: H,
+			env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judgeBin }
+		});
+		const prompt = readFileSync(captured, 'utf8');
+
+		assert.equal(result.stdout, '');
+		assert.ok(prompt.includes('EARLIER-REASON'));
+		assert.ok(prompt.includes('PREVIOUS-EVIDENCE'));
+		assert.ok(prompt.includes('반박 근거로 쓰지 않는다'));
+		// 앞선 턴의 사용자 메시지는 미응답 판정 대상에서 제외
+		assert.ok(!prompt.split('[최근 도구 기록]')[0].includes('앞선 턴 지시'));
+	});
+});
+
+test('코덱스 원인 판정 훅이 이번 턴 앞선 텍스트를 판정기에 넘긴다', () => {
+	withTmp('portfolio-codex-judge-', tmp => {
+		const bin = join(tmp, 'bin');
+		const captured = join(tmp, 'prompt.txt');
+
+		mkdirSync(bin);
+		mkdirSync(join(tmp, 'codex-why-judge'));
+		writeFileSync(join(tmp, 'codex-why-judge', 't1'), '왜 남겨둔거임?');
+		// codex exec -o <파일> - 형식: 입력은 표준입력, 판정은 -o 파일에 씀
+		writeFileSync(
+			join(bin, 'codex'),
+			`#!/bin/sh\nwhile [ "$1" != "-o" ]; do shift; done\nout="$2"\ncat >"${captured}"\necho '{"ok": true}' >"$out"\n`
+		);
+		chmodSync(join(bin, 'codex'), 0o755);
+
+		const result = spawnSync('sh', [resolve(H, '.codex/hooks/block-unverified-claims.sh')], {
+			input: JSON.stringify({
+				turn_id: 't1',
+				transcript_path: writeTranscript(tmp),
+				last_assistant_message: '보관했습니다.'
+			}),
+			encoding: 'utf8',
+			cwd: H,
+			env: { ...env, TMPDIR: tmp, PATH: `${bin}:${env.PATH}` }
+		});
+
+		assert.equal(result.stdout, '');
+		assert.ok(readFileSync(captured, 'utf8').includes('EARLIER-REASON'));
+	});
+});
+
+test('클로드 기획서 인용 훅이 소문자 경로 인용과 코드 펜스·인용 줄은 통과시키고 근거 없는 주장 줄만 막는다', () => {
+	withTmp('portfolio-prd-', tmp => {
+		const stop = text => {
+			const path = join(tmp, 'transcript.jsonl');
+
+			writeFileSync(
+				path,
+				`${[
+					{ type: 'user', message: { content: '보고해' } },
+					{ type: 'assistant', message: { content: [{ type: 'text', text }] } }
+				]
+					.map(entry => JSON.stringify(entry))
+					.join('\n')}\n`
+			);
+
+			return runIn('.claude', 'check-prd-claim-citation', { transcript_path: path }, tmp).stdout;
+		};
+
+		assert.equal(stop('집계 기준은 PRD 근거입니다(docs/prd.md:120).'), '');
+		assert.equal(stop('```\n- PRD 사본 추가와 프로젝트 규칙에 PRD 경로 등록\n```'), '');
+		assert.equal(stop('본문의 "PRD 사본 추가" 줄은 원래 커밋에 있던 줄입니다.'), '');
+		assert.equal(stop('표기 규칙은 PRD 미정이라 사용자 결정 항목으로 분리합니다.'), '');
+		assert.equal(JSON.parse(stop('집계 기준은 PRD에 따라 일 단위입니다.')).decision, 'block');
+	});
+});

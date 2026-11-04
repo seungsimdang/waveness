@@ -255,6 +255,18 @@
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/judge-unverified-claims.sh\"",
             "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-ask-tool-for-decisions.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/block-reask-after-free-text-answer.sh\" stop"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-execution-for-declared-step.sh\""
           }
         ]
       }
