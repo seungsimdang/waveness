@@ -924,6 +924,51 @@ test('AskUserQuestion 직접 입력 답변 뒤 같은 응답의 재질문을 차
 	}
 });
 
+test('결정 질문 경로 훅이 질문 창 없이 텍스트로 쓴 결정 질문만 차단한다', () => {
+	const fixture = mkdtempSync(join(tmpdir(), 'portfolio-ask-tool-hook-'));
+
+	try {
+		const transcript = join(fixture, 'transcript.jsonl');
+
+		const prompt = { type: 'user', message: { content: '이어서 해' } };
+
+		const answered = {
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: 'answered' }] },
+			toolUseResult: { questions: [], answers: { 'D-01?': '확대 없음' } }
+		};
+
+		const denied = {
+			type: 'user',
+			message: { content: [{ type: 'tool_result', content: 'hook error', is_error: true }] },
+			toolUseResult: 'Error: PreToolUse:AskUserQuestion hook error'
+		};
+
+		const decide = (message, ...entries) => {
+			writeFileSync(transcript, entries.map(entry => JSON.stringify(entry)).join('\n'));
+
+			const { stdout } = run('.claude', 'require-ask-tool-for-decisions', {
+				transcript_path: transcript,
+				last_assistant_message: message
+			});
+
+			return stdout.trim() ? JSON.parse(stdout).decision : 'allow';
+		};
+
+		const question = 'D-13은 기획서와 Figma 중 어느 쪽으로 할까요?';
+
+		assert.equal(decide(question, prompt), 'block');
+		assert.equal(decide('남은 결정을 정해 주세요.', prompt), 'block');
+		assert.equal(decide(question, prompt, answered), 'allow');
+		assert.equal(decide(question, prompt, denied), 'block');
+		assert.equal(decide(question, answered, prompt), 'block');
+		assert.equal(decide('남은 결정은 다음 메시지 후 질문 창으로 여쭙겠습니다.', prompt), 'allow');
+		assert.equal(decide('> 어느 쪽으로 할까요?\n\n인용한 질문에 답합니다.', prompt), 'allow');
+	} finally {
+		rmSync(fixture, { recursive: true, force: true });
+	}
+});
+
 const withTmp = (prefix, body) => {
 	const tmp = mkdtempSync(join(tmpdir(), prefix));
 

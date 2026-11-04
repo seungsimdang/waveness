@@ -29,6 +29,6 @@ free_text=$(jq -n '
 
 [ "$free_text" = "true" ] || exit 0
 
-reason="직전 AskUserQuestion 답변에 사용자가 직접 입력한 내용이 있음. 그 내용(질문이면 답변)을 텍스트로만 처리하고 응답을 끝낼 것. 파일 수정·위임·남은 질문은 사용자의 다음 메시지 이후에 할 것."
+reason="직전 AskUserQuestion 답변에 사용자가 직접 입력한 내용이 있음. 그 내용(질문이면 답변)을 텍스트로만 처리하고 응답을 끝낼 것. 파일 수정·위임·남은 질문은 사용자의 다음 메시지 이후에 할 것. 이 응답에는 새 결정 질문을 텍스트로도 쓰지 말고, 다음 메시지 후 질문 창으로 묻겠다고만 적을 것."
 jq -n --arg r "$reason" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 exit 0

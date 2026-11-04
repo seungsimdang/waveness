@@ -1,5 +1,13 @@
 # 하네스 변경 이력
 
+## 2026-11-04 chore(harness): 결정 질문 질문 창 강제 훅 추가
+
+- Harness-Origin: `seojin-camshaft-monitoring-frontend@9af437661db3143c71279e2ec37d3f2b0bb42ffb`
+
+> - 질문 창 답변 없이 결정 요청 질문을 텍스트로 쓴 응답을 1회 차단하는 Stop 훅 추가, 재질문 훅에 막힌 호출은 질문 창 사용으로 세지 않음
+> - 직접 입력 답변 판정은 재질문 훅 단독 책임으로 두고, 재질문 훅 안내에 같은 응답의 텍스트 결정 질문 금지 문구 추가
+> - 신규 훅 Stop 등록과 판정 회귀 테스트 추가
+
 ## 2026-11-03 fix(harness): 쓰기 가능 subagent 격리 강제와 격리 결과 회수 절차 추가
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@5d5c085df47612bc393fbd9482823b75971d9bd7`
