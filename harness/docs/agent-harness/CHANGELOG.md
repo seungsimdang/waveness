@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-11-05 fix(harness): 한화 공용 역할 지침 동기화 충돌 해결
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@d94a44ecc24c8204049e75b2e92f7defdd73387d`
+- 구현·검증 역할 정리 내용의 기존 반영 확인 및 원본 커밋 재적용 방지
+- worktree 설치·커밋 금지와 범위 밖 조건·Figma 차이 보고 지침 보존
+
 ## 2026-11-04 chore(harness): Stop 훅 오탐 수정(기획서 인용 판정, 미확인 단정 판정)
 
 - Harness-Origin: `seojin-camshaft-monitoring-frontend@bd2fa7d9d29b5dd6d000c85f89b65fd47c683447`
