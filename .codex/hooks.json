@@ -60,6 +60,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/block-lint-warnings-on-commit.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/require-answer-before-edit.sh\""
           }
         ]
       },
@@ -77,6 +81,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/codex-tool-adapter.mjs\" block-comment-line-wrap"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/codex-tool-adapter.mjs\" require-answer-before-edit"
           }
         ]
       }
@@ -172,6 +180,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/block-unverified-claims.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/require-answer-before-edit.sh\""
           },
           {
             "type": "command",

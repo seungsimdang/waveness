@@ -24,6 +24,8 @@
 .harness/test-titles.test.mjs
 .harness/spec.test.mjs
 .harness/runtime-hooks.test.mjs
+.harness/deferred-claims-pattern.txt
+.harness/deferred-claims-exempt-pattern.txt
 .harness/check-ephemeral-comment-refs.sh
 .harness/check-comment-line-breaks.mjs
 .harness/korean-test-titles.grit

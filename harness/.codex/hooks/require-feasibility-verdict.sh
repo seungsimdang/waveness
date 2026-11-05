@@ -48,7 +48,7 @@ if event == "PostToolUse":
     if os.path.exists(mark):
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PostToolUse",
-            "additionalContext": "가능 여부 질문 처리 중: 다음 메시지가 최종 답변이면 진행 안내 없이 가능합니다. 또는 불가능합니다.로 시작할 것.",
+            "additionalContext": "가능 여부 질문 처리 중: 다음 메시지가 최종 답변이면 진행 안내 없이 가능합니다. 또는 불가능합니다.로 시작할 것. 둘째 문장부터도 범위가 나뉜다, 일부만 된다처럼 판정을 다시 쪼개지 말고, 단서는 판정을 유지한 조건으로만 덧붙일 것.",
         }}, ensure_ascii=False))
     sys.exit(0)
 
@@ -102,10 +102,22 @@ if data.get("stop_hook_active") or not answer:
 # 제목·강조·인용 기호를 걷어낸 뒤 답변 첫머리가 판정인지 봄
 # 사용자가 일부만 가능하다는 분할 판정을 금지하고 가능하다/불가능하다로만 답하라고 지시해 두 판정만 허용함
 body = re.sub(r"^[\s#*>-]+", "", answer)
-if re.match(r"(불)?가능합니다", body):
+verdict = re.match(r"(불)?가능합니다", body)
+# 첫머리 판정 뒤에서 범위를 나누거나 일부만 된다고 다시 쪼개면 분할 판정이라, 후보 표현이 있을 때만 판정기에 함께 물음
+split_candidate = None
+if verdict:
+    opposing = r"(?<!불)가능(?:하지만|합니다)" if verdict.group(1) else r"불가능(?:하지만|합니다)"
+    split_candidate = re.search(
+        r"나뉩니다|나뉜다|나뉘어|나눠집니다|일부만|일부는|부분적으로|경우에 따라|항목마다 다르|항목별로 다르|" + opposing,
+        body[verdict.end():],
+    )
+if verdict and not split_candidate:
     clear_mark()
     sys.exit(0)
-problem = "답변이 가능합니다. 또는 불가능합니다.로 시작하지 않습니다."
+if verdict:
+    problem = "첫머리 판정 뒤에서 범위를 나누거나 일부만 된다고 해 판정을 다시 쪼갰습니다."
+else:
+    problem = "답변이 가능합니다. 또는 불가능합니다.로 시작하지 않습니다."
 
 try:
     with open(mark, encoding="utf-8") as candidates:
@@ -119,6 +131,24 @@ judge_prompt = f"""아래 [사용자 메시지]에 사용자가 어떤 일이 �
 
 [사용자 메시지]
 {user_prompt}
+"""
+if verdict:
+    judge_body = body[:3000]
+    start = verdict.end() + split_candidate.start()
+    end = verdict.end() + split_candidate.end()
+    # 긴 답변에서도 검사 후보가 판정기에 전달되도록 주변 문맥 추가
+    if end > 3000:
+        judge_body += "\n\n[검사 후보 주변 문맥]\n" + body[max(0, start - 300):end + 300]
+    judge_prompt = f"""아래 [사용자 메시지]와 [답변]을 보고 두 가지를 판정해 JSON 한 줄만 출력한다.
+ask: [사용자 메시지]에 사용자가 어떤 일이 가능한지(할 수 있는지, 될 수 있는지)를 직접 묻는 질문이 있는지. 이전 답변 인용, "가능하다면 ~해" 같은 조건부 지시, 확인을 작업 단계로 둔 지시, 언급만 한 문장, 다른 것을 묻는 질문은 false.
+split: [답변]이 첫머리 판정을 내린 뒤 "범위가 나뉜다", "일부만 된다", 항목마다 다른 판정처럼 판정 자체를 다시 쪼갰는지. 판정을 유지한 채 오탐 가능성·전제 조건·작업 범위를 덧붙인 단서는 false.
+출력: {{"ask": true 또는 false, "split": true 또는 false}}
+
+[사용자 메시지]
+{user_prompt}
+
+[답변]
+{judge_body}
 """
 
 def judge_command(output_path):
@@ -144,18 +174,22 @@ try:
         )
         # Codex는 진행 로그가 stdout에 섞여 마지막 메시지 파일을 우선 읽음
         text = open(output_path, encoding="utf-8").read() if os.path.exists(output_path) else result.stdout
-    asked = json.loads(re.search(r"\{.*?\}", text, re.S).group(0)).get("ask")
+    parsed = json.loads(re.search(r"\{.*?\}", text, re.S).group(0))
+    asked = parsed.get("ask")
+    split = parsed.get("split")
 except Exception:
     # 판정기 호출이나 응답 해석이 실패하면 작업을 막지 않고 통과
     asked = False
-if asked is not True:
+    split = False
+if asked is not True or (verdict and split is not True):
     clear_mark()
     sys.exit(0)
 
 print(json.dumps({
     "decision": "block",
     "reason": "사용자가 가능 여부를 물었습니다. " + problem
-    + " 가능합니다. 또는 불가능합니다. 중 하나로 시작해 다시 답하세요. 일부만 가능하다는 분할 판정과 진행 안내로 시작하지 말고, 단서와 범위는 둘째 문장부터 쓰세요.",
+    + " 가능합니다. 또는 불가능합니다. 중 하나로 시작해 다시 답하세요. 일부만 가능하다는 분할 판정과 진행 안내로 시작하지 말고, 단서와 범위는 둘째 문장부터 쓰세요."
+    + " 단서는 판정을 유지한 채 조건(오탐 가능성, 전제, 작업 범위)으로만 덧붙이세요.",
 }, ensure_ascii=False))
 '
 

@@ -29,7 +29,8 @@ if not paragraphs:
     sys.exit(0)
 
 declare = re.compile(r"(시작|진행|투입|실행|착수)(하겠습니다|합니다)")
-wait = re.compile(r"뒤|후|오면|받으면|되면|전에는|전까지|기다")
+# "하시면·주시면·끝나면"처럼 조건형 어미로 대기 조건을 밝힌 문장도 대기 조건으로 인정
+wait = re.compile(r"뒤|후|오면|받으면|되면|전에는|전까지|기다|(하|주|시|나|끝나)면\s")
 
 for sentence in re.split(r"(?<=[.!?])\s+|\n", paragraphs[-1]):
     if declare.search(sentence) and not wait.search(sentence):

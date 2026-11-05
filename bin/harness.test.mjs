@@ -550,6 +550,8 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
     for (const file of [
       "spec.test.mjs",
       "runtime-hooks.test.mjs",
+      "deferred-claims-pattern.txt",
+      "deferred-claims-exempt-pattern.txt",
       "git-guards.test.mjs",
       "test-titles.test.mjs",
       "check-comment-line-breaks.mjs",
@@ -578,6 +580,8 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
     commit(up, "test: 공용 검사 추가");
     git(up, "push", "-q", "origin", "HEAD:main");
     writeFileSync(join(hub, "harness/.harness/korean-test-titles.grit"), "플러그인\n");
+    for (const name of ["deferred-claims-pattern.txt", "deferred-claims-exempt-pattern.txt"])
+      writeFileSync(join(hub, "harness/.harness", name), `공용 패턴 ${name}\n`);
     git(hub, "add", ".");
     commit(hub, "test: 플러그인 추가");
     assert.match(sync(), /seungness/);
@@ -586,6 +590,8 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
       assert.equal(read(dir, "harness/.harness/biome-check.mjs"), "// 자동 수정 실행기\n");
       assert.equal(read(dir, "harness/.harness/editor/extension.cjs"), "// 저장 확장\n");
       assert.equal(read(dir, "harness/.harness/korean-test-titles.grit"), "플러그인\n");
+      for (const name of ["deferred-claims-pattern.txt", "deferred-claims-exempt-pattern.txt"])
+        assert.equal(read(dir, "harness/.harness", name), `공용 패턴 ${name}\n`);
     }
     appendFileSync(join(hub, "harness/.harness/runtime-hooks.test.mjs"), "// 프로젝트에서 보완\n");
     appendFileSync(join(hub, "harness/.harness/biome-check.mjs"), "// 실행기 보완\n");

@@ -240,6 +240,19 @@ for (const tool of ['.claude', '.codex']) {
 		assert.equal(edit('/repo/src/app/page.tsx'), false);
 		prompt('가능한 내용은 강제해');
 		assert.equal(edit('/repo/src/app/page.tsx'), false);
+		for (const execution of [
+			'청사진대로 수정 후 amend하여 커밋/푸시해',
+			'청사진대로 수정하고 마무리',
+			'청사진대로 amend하여 마무리',
+			'청사진대로 커밋/푸시해'
+		]) {
+			prompt(execution);
+			assert.equal(edit('/repo/src/app/page.tsx'), false);
+		}
+		for (const report of ['청사진 보여줘', '수정 후 영향이 어떤지 판단하여 보고해', '커밋/푸시해도 되는지 판단하여 보고해']) {
+			prompt(report);
+			assert.equal(edit('/repo/src/app/page.tsx'), true);
+		}
 	});
 	test(`${tool} 주석 줄바꿈 훅이 문장 중간 줄바꿈을 차단하고 한 줄 한 문장을 허용한다`, () => {
 		const write = content =>
@@ -672,6 +685,73 @@ for (const tool of ['.claude', '.codex']) {
 			rmSync(marks, { recursive: true, force: true });
 		}
 	});
+
+	test(`${tool} 가능 여부 훅이 첫머리 판정 뒤에서 판정을 다시 쪼갠 응답을 막는다`, () => {
+		const marks = mkdtempSync(join(tmpdir(), 'portfolio-feasibility-split-'));
+
+		// 실제 LLM 대신 판정 결과(또는 고장)를 고정한 스크립트를 판정기로 씀
+		const judge = (name, output) => {
+			const path = join(marks, `judge-${name}.sh`);
+
+			writeFileSync(path, `#!/bin/sh\ncat >"${marks}/seen"\n${output}\n`);
+			chmodSync(path, 0o755);
+
+			return path;
+		};
+
+		const splitJudge = judge('split', `echo '{"ask": true, "split": true}'`);
+		const keepJudge = judge('keep', `echo '{"ask": true, "split": false}'`);
+		const brokenJudge = judge('broken', 'exit 1');
+
+		try {
+			const answer = (judgeBin, message) => {
+				writeFileSync(join(marks, 'seen'), '');
+				const hook = input =>
+					spawnSync('sh', [resolve(H, tool, 'hooks', 'require-feasibility-verdict.sh')], {
+						input: JSON.stringify({ session_id: 's1', ...input }),
+						encoding: 'utf8',
+						cwd: H,
+						env: { ...env, TMPDIR: marks, STOP_JUDGE_BIN: judgeBin }
+					});
+
+				hook({ hook_event_name: 'UserPromptSubmit', prompt: '훅으로 강제할 수 있는지 검토 후 보고해' });
+
+				const { stdout } = hook({ hook_event_name: 'Stop', last_assistant_message: message });
+
+				// 다음 확인이 이전 표시의 영향을 받지 않게 재응답 처리로 표시를 지움
+				hook({ hook_event_name: 'Stop', last_assistant_message: message, stop_hook_active: true });
+
+				return stdout;
+			};
+
+			const split = '가능합니다. 다만 막을 수 있는 범위는 둘로 나뉩니다.';
+
+			assert.equal(JSON.parse(answer(splitJudge, split)).decision, 'block');
+			assert.ok(JSON.parse(answer(splitJudge, split)).reason.includes('다시 쪼갰습니다'));
+			assert.equal(answer(keepJudge, '가능합니다. LLM 판정이라 일부는 오탐이 생길 수 있습니다.'), '');
+			assert.equal(answer(splitJudge, '가능합니다. LLM 판정이라 오탐이 생길 수 있습니다.'), '');
+			assert.equal(answer(brokenJudge, split), '');
+			for (const message of [
+				'가능합니다. A는 가능하지만 B는 불가능합니다.',
+				'불가능합니다. A는 불가능하지만 B는 가능합니다.'
+			]) {
+				assert.equal(JSON.parse(answer(splitJudge, message)).decision, 'block');
+			}
+			for (const message of ['가능합니다. A도 가능합니다.', '불가능합니다. A도 불가능합니다.']) {
+				assert.equal(answer(splitJudge, message), '');
+				assert.equal(readFileSync(join(marks, 'seen'), 'utf8'), '');
+			}
+			const long = `가능합니다. ${'배경 설명입니다. '.repeat(400)}A는 가능하지만 B는 불가능합니다. 후속 문맥입니다.`;
+
+			assert.equal(JSON.parse(answer(splitJudge, long)).decision, 'block');
+			const seen = readFileSync(join(marks, 'seen'), 'utf8');
+
+			assert.ok(seen.includes('B는 불가능합니다. 후속 문맥입니다.'));
+			assert.ok(seen.includes('[검사 후보 주변 문맥]'));
+		} finally {
+			rmSync(marks, { recursive: true, force: true });
+		}
+	});
 }
 
 test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 입력을 판정 대상에 넣는다', () => {
@@ -724,6 +804,12 @@ test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 �
 		assert.equal(existsSync(seen), true);
 
 		assert.equal(stop('권한이 없어 확인하지 못했습니다.', 's2'), '');
+		assert.equal(stop('확인하지 않은 이유는 주석 한 줄을 결론으로 받아들였기 때문입니다.', 's6'), '');
+		assert.equal(stop('그래서 피그마대로가 어떤 화면을 뜻하는지 확정할 수 없습니다.', 's7'), '');
+		assert.ok(readFileSync(seen, 'utf8').includes('가장 마지막 결과를 기준으로'));
+		assert.ok(readFileSync(seen, 'utf8').includes('응답자 자신의 판단 경위'));
+		assert.equal(JSON.parse(stop('아직 시험하지 않았기 때문에 확정할 수 없습니다.', 's8')).decision, 'block');
+		assert.equal(JSON.parse(stop('이유는 아직 시험하지 않았습니다.', 's9')).decision, 'block');
 		assert.equal(stop('`확인하지 않았습니다` 표현을 막습니다.', 's3'), '');
 
 		stop('답했습니다.', 's4', answer('왜 3초임?'));
@@ -733,6 +819,30 @@ test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 �
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test('.claude 판정 훅이 사유에 통과라고 적은 모순 판정은 차단하지 않는다', () => {
+	withTmp('portfolio-judge-', tmp => {
+		const judgeBin = join(tmp, 'judge.sh');
+		const transcript = join(tmp, 'transcript.jsonl');
+
+		writeFileSync(transcript, `${JSON.stringify({ type: 'user', uuid: 'u1', message: { content: '보고해' } })}\n`);
+
+		const stop = (reason, session) => {
+			writeFileSync(judgeBin, `#!/bin/sh\ncat >/dev/null\necho '{"ok": false, "reason": "${reason}"}'\n`);
+			chmodSync(judgeBin, 0o755);
+
+			return spawnSync('sh', [resolve(H, '.claude/hooks/judge-unverified-claims.sh')], {
+				input: JSON.stringify({ session_id: session, transcript_path: transcript, last_assistant_message: '노드는 29:9687입니다.' }),
+				encoding: 'utf8',
+				cwd: H,
+				env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judgeBin }
+			}).stdout;
+		};
+
+		assert.equal(stop('도구 결과로 뒷받침되므로 통과 대상이다.', 's1'), '');
+		assert.equal(JSON.parse(stop('노드 ID 근거가 없습니다. 파일을 읽고 다시 답하세요.', 's2')).decision, 'block');
+	});
 });
 
 test('클로드 리뷰 누락 훅이 위반을 검출한다', {
@@ -894,7 +1004,7 @@ test('AskUserQuestion 직접 입력 답변 뒤 같은 응답의 재질문을 차
 		assert.ok(
 			JSON.parse(readFileSync(resolve(H, '.claude/settings.json'), 'utf8')).hooks.PreToolUse.some(
 				({ matcher, hooks }) =>
-					matcher.split('|').includes('Edit') &&
+					(matcher ?? '').split('|').includes('Edit') &&
 					hooks.some(({ command }) => command.includes('block-reask-after-free-text-answer'))
 			)
 		);
@@ -959,6 +1069,8 @@ test('결정 질문 경로 훅이 질문 창 없이 텍스트로 쓴 결정 질�
 
 		assert.equal(decide(question, prompt), 'block');
 		assert.equal(decide('남은 결정을 정해 주세요.', prompt), 'block');
+		assert.equal(decide('사용할 티켓 번호(또는 브랜치명)를 알려주세요.', prompt), 'allow');
+		assert.equal(decide('두 방식 중 어느 쪽으로 할지 알려주세요.', prompt), 'block');
 		assert.equal(decide(question, prompt, answered), 'allow');
 		assert.equal(decide(question, prompt, denied), 'block');
 		assert.equal(decide(question, answered, prompt), 'block');
@@ -1031,6 +1143,12 @@ for (const tool of ['.claude', '.codex']) {
 		assert.equal(decide('보고가 오면 이어서 진행하겠습니다.'), 'allow');
 		assert.equal(decide('구현 담당자를 투입했고, 지금 구현을 진행 중입니다.'), 'allow');
 		assert.equal(decide('> 구현을 시작합니다\n\n인용한 문장에 답합니다.'), 'allow');
+		assert.equal(decide('미리보기입니다.\n\n승인하시면 `git commit --amend`를 실행합니다.'), 'allow');
+		assert.equal(decide('삭제가 끝나면 지난 응답에서 말씀드린 1~4단계를 이어서 진행합니다.'), 'allow');
+		assert.equal(decide('적용할 항목을 지정해 주시면 그 절차로 진행하겠습니다.'), 'allow');
+		for (const noun of ['화면', '장면', '측면', '단면', '평면']) {
+			assert.equal(decide(`공정 현황 ${noun} 구현을 시작합니다.`), 'block');
+		}
 	});
 }
 
@@ -1038,7 +1156,7 @@ const withTmp = (prefix, body) => {
 	const tmp = mkdtempSync(join(tmpdir(), prefix));
 
 	try {
-		body(tmp);
+		return body(tmp);
 	} finally {
 		rmSync(tmp, { recursive: true, force: true });
 	}
@@ -1068,7 +1186,10 @@ for (const tool of ['.claude', '.codex']) {
 				},
 				tmp
 			);
-			assert.ok(JSON.parse(post()).hookSpecificOutput.additionalContext.includes('가능합니다.'));
+			const context = JSON.parse(post()).hookSpecificOutput.additionalContext;
+
+			assert.ok(context.includes('가능합니다.'));
+			assert.ok(context.includes('판정을 다시 쪼개지 말고'));
 		});
 	});
 
@@ -1103,12 +1224,50 @@ for (const tool of ['.claude', '.codex']) {
 				'새 훅을 실제로 만들어 돌려 본 결과는 아닙니다.',
 				'`/cd` 후 동작은 미시험입니다.',
 				'문서에서 찾지 못해 근거는 없습니다.',
-				'대기 시간은 측정하지 않았습니다.'
+				'대기 시간은 측정하지 않았습니다.',
+				'아직 시험하지 않았기 때문에 확정할 수 없습니다.',
+				'이유는 아직 시험하지 않았습니다.'
 			]) {
 				assert.equal(JSON.parse(stop(deferred)).decision, 'block');
 				assert.equal(stop(deferred, true), '');
 			}
 			assert.equal(stop('> 시험해 보기 전에는 확정할 수 없습니다.'), '');
+
+			for (const exempt of [
+				'확인하지 않은 이유는 주석 한 줄을 결론으로 받아들였기 때문입니다.',
+				'그래서 피그마대로가 어떤 화면을 뜻하는지 확정할 수 없습니다.'
+			]) {
+				assert.equal(stop(exempt), '');
+			}
+		});
+	});
+}
+
+for (const tool of ['.claude', '.codex']) {
+	test(`${tool} 빈 예외 패턴이 확인 미룸 차단을 해제하지 않는다`, () => {
+		withTmp('portfolio-empty-exempt-', tmp => {
+			const name = tool === '.claude' ? 'judge-unverified-claims' : 'block-unverified-claims';
+			const hook = join(tmp, tool, 'hooks', `${name}.sh`);
+			const patterns = join(tmp, '.harness');
+			const judge = join(tmp, 'judge.sh');
+
+			mkdirSync(dirname(hook), { recursive: true });
+			mkdirSync(patterns);
+			writeFileSync(hook, readFileSync(resolve(H, tool, 'hooks', `${name}.sh`)));
+			writeFileSync(join(patterns, 'deferred-claims-pattern.txt'), readFileSync(resolve(H, '.harness/deferred-claims-pattern.txt')));
+			writeFileSync(join(patterns, 'deferred-claims-exempt-pattern.txt'), ' \n\t');
+			writeFileSync(judge, '#!/bin/sh\ncat >/dev/null\necho \'{"ok": true}\'\n');
+			chmodSync(judge, 0o755);
+
+			const result = spawnSync('sh', [hook], {
+				input: JSON.stringify({ last_assistant_message: '대기 시간은 측정하지 않았습니다.' }),
+				encoding: 'utf8',
+				cwd: tmp,
+				env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judge }
+			});
+
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(JSON.parse(result.stdout).decision, 'block');
 		});
 	});
 }
@@ -1154,10 +1313,80 @@ test('클로드 미확인 판정 훅이 이번 턴 앞선 텍스트와 직전 �
 		assert.ok(prompt.includes('EARLIER-REASON'));
 		assert.ok(prompt.includes('PREVIOUS-EVIDENCE'));
 		assert.ok(prompt.includes('반박 근거로 쓰지 않는다'));
-		// 앞선 턴의 사용자 메시지는 미응답 판정 대상에서 제외
+		// 앞선 턴의 사용자 메시지는 원인 판정 대상에서 제외
 		assert.ok(!prompt.split('[최근 도구 기록]')[0].includes('앞선 턴 지시'));
 	});
 });
+
+for (const tool of ['.claude', '.codex']) {
+	test(`${tool} 질문 응답 훅이 답하지 않은 질문이 있으면 파일 수정과 턴 종료를 막는다`, () => {
+		const judge = (tmp, name, body) => {
+			const path = join(tmp, `${name}.sh`);
+
+			writeFileSync(path, `#!/bin/sh\ncat >"${tmp}/called"\n${body}\n`);
+			chmodSync(path, 0o755);
+
+			return path;
+		};
+		const decide = (prompt, input, verdict, replies = ['기록하겠습니다.']) =>
+			withTmp('portfolio-answer-', tmp => {
+				const transcript = join(tmp, 'transcript.jsonl');
+
+				writeFileSync(
+					transcript,
+					`${[
+						{ type: 'user', uuid: 'u1', message: { content: prompt } },
+						...replies.map(text => ({ type: 'assistant', message: { content: [{ type: 'text', text }] } }))
+					]
+						.map(entry => JSON.stringify(entry))
+						.join('\n')}\n`
+				);
+				const bin = judge(tmp, 'judge', verdict);
+				const call = () =>
+					spawnSync('sh', [resolve(H, tool, 'hooks', 'require-answer-before-edit.sh')], {
+						input: JSON.stringify({ session_id: 's1', transcript_path: transcript, ...input }),
+						encoding: 'utf8',
+						cwd: H,
+						env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: bin }
+					}).stdout;
+				const first = call();
+				const parsed = first.trim() ? JSON.parse(first) : null;
+
+				return {
+					result: parsed?.hookSpecificOutput?.permissionDecision ?? parsed?.decision ?? 'allow',
+					again: call().trim() ? 'block' : 'allow',
+					called: existsSync(join(tmp, 'called'))
+				};
+			});
+		const edit = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'a.md' } };
+		const bash = command => ({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } });
+		const stop = { hook_event_name: 'Stop', last_assistant_message: '기록했습니다.' };
+		const unanswered = `echo '{"unanswered": "뭐가 문제임?"}'`;
+		const answered = `echo '{"unanswered": null}'`;
+		const question = '28-8462로 하면 되는데 뭐가 문제임?';
+
+		// 답하지 않은 질문은 같은 질문 묶음이 남아 있는 동안 수정마다 막음
+		assert.deepEqual(decide(question, edit, unanswered), { result: 'deny', again: 'block', called: true });
+		// 답한 질문 묶음은 한 번 통과하면 같은 턴에서 다시 판정하지 않음
+		assert.deepEqual(decide(question, edit, answered), { result: 'allow', again: 'allow', called: true });
+		// 의문형 후보가 없는 작업 지시는 판정기를 부르지 않음
+		assert.deepEqual(decide('D16 답변 기록해', edit, unanswered), { result: 'allow', again: 'allow', called: false });
+		assert.equal(decide(question, bash('cat a.md 2>/dev/null'), unanswered).called, false);
+		assert.equal(decide(question, bash("sed -i '' 's/a/b/' a.md"), unanswered).result, 'deny');
+		assert.equal(decide(question, bash('echo 기록 > a.md'), unanswered).result, 'deny');
+		assert.equal(decide(question, bash('python3 -c \'from pathlib import Path; Path("x").write_text("x")\''), unanswered).result, 'deny');
+		assert.equal(decide(question, bash('python3 -c \'from pathlib import Path; Path("x").write_bytes(b"x")\''), unanswered).result, 'deny');
+		assert.equal(decide(question, bash('python3 -c \'from pathlib import Path; print(Path("x").read_text())\''), unanswered).called, false);
+		// Stop은 같은 질문 묶음을 한 번만 막음
+		assert.deepEqual(decide(question, stop, unanswered), { result: 'block', again: 'allow', called: true });
+		// 판정기가 고장 나면 통과
+		assert.equal(decide(question, edit, 'echo broken').result, 'allow');
+		// 응답 기록이 없는 질문 턴도 편집 전 판정하고, 질문 없는 작업 지시는 통과
+		assert.deepEqual(decide(question, edit, unanswered, []), { result: 'deny', again: 'block', called: true });
+		assert.deepEqual(decide('D16 답변 기록해', edit, unanswered, []), { result: 'allow', again: 'allow', called: false });
+		assert.equal(decide(question, stop, unanswered, []).result, 'block');
+	});
+}
 
 test('코덱스 원인 판정 훅이 이번 턴 앞선 텍스트를 판정기에 넘긴다', () => {
 	withTmp('portfolio-codex-judge-', tmp => {
@@ -1190,7 +1419,9 @@ test('코덱스 원인 판정 훅이 이번 턴 앞선 텍스트를 판정기에
 	});
 });
 
-test('클로드 기획서 인용 훅이 소문자 경로 인용과 코드 펜스·인용 줄은 통과시키고 근거 없는 주장 줄만 막는다', () => {
+test('클로드 기획서 인용 훅이 소문자 경로 인용과 코드 펜스·인용 줄은 통과시키고 근거 없는 주장 줄만 막는다', {
+	skip: !existsSync(resolve(H, '.claude/hooks/check-prd-claim-citation.sh'))
+}, () => {
 	withTmp('portfolio-prd-', tmp => {
 		const stop = text => {
 			const path = join(tmp, 'transcript.jsonl');
@@ -1205,13 +1436,31 @@ test('클로드 기획서 인용 훅이 소문자 경로 인용과 코드 펜스
 					.join('\n')}\n`
 			);
 
-			return runIn('.claude', 'check-prd-claim-citation', { transcript_path: path }, tmp).stdout;
+			return spawnSync('sh', [resolve(H, '.claude/hooks/check-prd-claim-citation.sh')], {
+				input: JSON.stringify({ session_id: 's1', transcript_path: path }),
+				encoding: 'utf8',
+				cwd: H,
+				env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judgeBin }
+			}).stdout;
 		};
+		const judgeBin = join(tmp, 'judge.sh');
+		const judge = output => {
+			writeFileSync(judgeBin, `#!/bin/sh\ncat >/dev/null\necho '${output}'\n`);
+			chmodSync(judgeBin, 0o755);
+		};
+
+		judge('{"claims": [1]}');
 
 		assert.equal(stop('집계 기준은 PRD 근거입니다(docs/prd.md:120).'), '');
 		assert.equal(stop('```\n- PRD 사본 추가와 프로젝트 규칙에 PRD 경로 등록\n```'), '');
 		assert.equal(stop('본문의 "PRD 사본 추가" 줄은 원래 커밋에 있던 줄입니다.'), '');
 		assert.equal(stop('표기 규칙은 PRD 미정이라 사용자 결정 항목으로 분리합니다.'), '');
+		assert.equal(JSON.parse(stop('집계 기준은 PRD에 따라 일 단위입니다.')).decision, 'block');
+
+		judge('{"claims": []}');
+		assert.equal(stop('PRD 기간·시간대 불일치는 사람 승인 필요 항목으로 분리합니다.'), '');
+
+		judge('해석 불가');
 		assert.equal(JSON.parse(stop('집계 기준은 PRD에 따라 일 단위입니다.')).decision, 'block');
 	});
 });

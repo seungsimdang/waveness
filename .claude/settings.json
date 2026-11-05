@@ -90,6 +90,11 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/block-lint-warnings-on-commit.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-answer-before-edit.sh\"",
+            "timeout": 90
           }
         ]
       },
@@ -108,6 +113,11 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/confirm-edit-on-report-request.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-answer-before-edit.sh\"",
+            "timeout": 90
           }
         ]
       },
@@ -254,6 +264,11 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/judge-unverified-claims.sh\"",
+            "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-answer-before-edit.sh\"",
             "timeout": 90
           },
           {

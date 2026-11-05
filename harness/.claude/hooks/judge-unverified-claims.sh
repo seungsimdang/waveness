@@ -1,11 +1,12 @@
 #!/bin/sh
-# Stop 훅(차단): 마지막 응답의 확인 미룸 표현을 정규식으로 턴마다 한 번 먼저 막고, 이어서 근거 없는 단정, 구체성 없는 확인 요청, 사용자 질문 미응답, 자기 행동 이유 질문에 원인 없이 경위만 답한 것을 LLM으로 판정해 턴 종료를 막음
+# Stop 훅(차단): 마지막 응답의 확인 미룸 표현을 정규식으로 턴마다 한 번 먼저 막고, 이어서 근거 없는 단정, 구체성 없는 확인 요청, 자기 행동 이유 질문에 원인 없이 경위만 답한 것을 LLM으로 판정해 턴 종료를 막음
 # type prompt 훅은 single-turn이라 도구 결과를 못 보고, stop_hook_active 재판정 지시를 판정 모델이 무시해 반복 차단한 사고가 있어 command 훅으로 감쌈
 # Stop은 if를 지원하지 않고 같은 이벤트 훅은 병렬 실행이라, 결정적 가드는 이 스크립트 안에서만 둘 수 있음
 # 가드는 stop_hook_active와 턴별 차단 횟수 상한이며, 플래그가 계속 false로 들어온 보고(anthropics/claude-code#54360)가 있어 횟수를 파일로도 셈
 # 판정 호출은 --safe-mode로 hooks를 끄고 환경변수로도 재귀를 막음(--bare는 구독 로그인을 쓰지 않아 제외)
 # 판정 실패·타임아웃·해석 불가는 통과시켜 판정기 고장이 작업을 멈추지 않게 함
 # Codex는 prompt 판정을 쓰지 않고 .codex/hooks/block-unverified-claims.sh 정규식 판정을 유지함
+# 질문에 답했는지는 require-answer-before-edit.sh가 판정하고, 이 훅은 답의 근거와 원인만 판정함
 
 [ -n "${HARNESS_STOP_JUDGE:-}" ] && exit 0
 
@@ -82,7 +83,7 @@ for line in reversed(lines):
     except Exception:
         continue
     if is_user_prompt(entry):
-        # 앞선 턴의 사용자 메시지는 미응답 판정 대상이 아니라 prompts에 넣지 않음
+        # 앞선 턴의 사용자 메시지는 원인 판정 대상이 아니라 prompts에 넣지 않음
         if turns_seen == 0:
             turn_id = entry.get("uuid") or turn_id
             prompts.append(prompt_text(entry))
@@ -118,7 +119,8 @@ for line in reversed(lines):
             evidence.append("[도구 결과] " + block_text(block))
 user_prompt = "\n---\n".join(reversed(prompts)) or "(찾지 못함)"
 evidence_text = "\n".join(reversed(evidence))[-MAX_EVIDENCE_CHARS:] or "(최근 도구 실행 없음)"
-# 질문 창 직전 등 마지막 응답 이전에 쓴 설명도 질문 응답 여부 판정에 쓰도록 이번 턴 텍스트를 넘김. 마지막 응답과 겹치는 끝부분은 제외
+# 질문 창 직전 등 마지막 응답 이전에 쓴 설명도 원인 판정에 쓰도록 이번 턴 텍스트를 넘김
+# 마지막 응답과 겹치는 끝부분은 제외
 turn_text = "\n".join(reversed(turn_texts)).rstrip()
 if turn_text.endswith(answer.strip()):
     turn_text = turn_text[: -len(answer.strip())]
@@ -144,9 +146,16 @@ try:
         deferred_pattern = re.compile(pattern_file.read().strip())
 except Exception:
     deferred_pattern = None
+# 자기 판단의 원인 설명이나 사용자 의도처럼 도구로 확인할 대상이 아닌 문장은 미룸 판정에서 뺌(공용 파일, 읽지 못하면 제외 없이 판정)
+try:
+    with open(os.environ["DEFERRED_PATTERN_FILE"].replace("deferred-claims-pattern", "deferred-claims-exempt-pattern"), encoding="utf-8") as exempt_file:
+        exempt_pattern = exempt_file.read().strip()
+        deferred_exempt = re.compile(exempt_pattern) if exempt_pattern else None
+except Exception:
+    deferred_exempt = None
 if deferred_pattern and not os.path.exists(deferred_mark):
     for sentence in re.split(r"(?<=[.!?])\s+|\n", deferred_text):
-        if deferred_pattern.search(sentence):
+        if deferred_pattern.search(sentence) and not (deferred_exempt and deferred_exempt.search(sentence)):
             os.makedirs(os.environ["MARK_DIR"], exist_ok=True)
             open(deferred_mark, "w").close()
             print(json.dumps({"decision": "block", "reason": "확인을 미룬 보고가 있습니다: " + sentence.strip()[:120] + " 지금 도구로 확인할 수 있으면 확인한 결과로 다시 보고하세요. 정말 확인할 수 없으면 막힌 이유와 확인 방법을 적으세요."}, ensure_ascii=False))
@@ -158,13 +167,13 @@ prompt = f"""너는 Claude Code 응답 검토기다. 아래 [마지막 응답]�
 1. 응답 스스로 일반 지식·추측·미확인·미검증이라고 밝히면서 단정하거나 사용자에게 따르라고 안내한 주장
 2. 외부 서비스·라이브러리·도구·공식 문서·저장소·배포·환경의 현재 상태에 대한 구체적 단정(버전, 기본값, 메뉴 이름, 자동 동작, 배포 상태 등) 중 [최근 도구 기록]에도 응답에 적힌 출처(실행한 명령, 읽은 파일, 인용 문서)에도 근거가 없는 것
 3. 사용자에게 확인·조작을 요청하면서 전체 URL, 클릭·입력 순서, 알려 줄 값 중 하나라도 빠진 요청, 또는 코드·저장소·공개 문서처럼 도구로 직접 확인할 수 있는 것을 사용자에게 넘긴 요청
-4. [사용자 메시지](턴 시작 메시지와 작업 중에 보낸 메시지, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [마지막 응답 이전의 이번 턴 텍스트]와 [마지막 응답] 어디에서도 답하지 않은 것. 작업 지시는 질문이 아니다
-5. [사용자 메시지]가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답 이전의 이번 턴 텍스트]와 [마지막 응답]이 모두 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것
-6. 응답이 미검증, 확인하지 않음, 시험 전 확정 불가, 추측처럼 확인을 미룬 사항 중 저장소 파일 읽기, 명령 실행, 임시 사본 실험, 세션 기록 조회로 그 턴에 확인할 수 있었던 것. 미검증이나 추론이라고 표시했어도 면제되지 않는다
+4. [사용자 메시지](턴 시작 메시지와 작업 중에 보낸 메시지, ---로 구분)가 응답자 자신이 한 행동의 이유(왜 안 지켰나, 왜 그렇게 했나)를 묻는데 [마지막 응답 이전의 이번 턴 텍스트]와 [마지막 응답]이 모두 어긴 사실·경위·근거 파일만 나열하고, 그때 응답자가 무엇을 알고 있었고 무엇을 판단·선택했는지를 원인으로 밝히지 않은 것
+5. 응답이 미검증, 확인하지 않음, 시험 전 확정 불가, 추측처럼 확인을 미룬 사항 중 저장소 파일 읽기, 명령 실행, 임시 사본 실험, 세션 기록 조회로 그 턴에 확인할 수 있었던 것. 미검증이나 추론이라고 표시했어도 면제되지 않는다
 
-차단하지 않는 것: 도구 기록이나 응답의 출처 표기로 뒷받침되는 주장, 이전 턴에서 확인했다고 출처를 밝힌 주장, 사용자가 준 자료에 근거한 주장, 시도한 명령의 실패, 권한 거부, 외부 시스템 미가동, 사람의 결정 필요처럼 실제로 막힌 이유와 확인 방법을 밝힌 보고, 근거를 대고 추론이라고 표시했으며 도구로 더 확인할 수 없는 판단, 사용자가 고를 선택지 설명, 계획·진행 상황 보고, 일반 프로그래밍 개념 설명.
+차단하지 않는 것: 응답자 자신의 판단 경위·동기·원인 설명, 직전 질문 창 직접 입력 때문에 남은 결정을 다음 사용자 메시지 뒤 질문 창으로 묻겠다고 미룬 것, 도구 기록이나 응답의 출처 표기로 뒷받침되는 주장, 이전 턴에서 확인했다고 출처를 밝힌 주장, 사용자가 준 자료에 근거한 주장, 시도한 명령의 실패, 권한 거부, 외부 시스템 미가동, 사람의 결정 필요처럼 실제로 막힌 이유와 확인 방법을 밝힌 보고, 근거를 대고 추론이라고 표시했으며 도구로 더 확인할 수 없는 판단, 사용자가 고를 선택지 설명, 계획·진행 상황 보고, 일반 프로그래밍 개념 설명.
 [사용자 메시지]·[최근 도구 기록]에 없는 세션 스냅샷·시스템 정보·기억을 반박 근거로 쓰지 않는다.
-작업 완료 여부와 남은 단계는 판정하지 않는다. 확신이 없으면 통과시킨다.
+같은 대상의 도구 결과가 여러 번 있으면 가장 마지막 결과를 기준으로 판정하고, 상태를 바꾸는 명령(파일 수정, git add 등) 이후에는 그 전 결과로 반박하지 않는다.
+작업 완료 여부와 남은 단계는 판정하지 않는다. 확신이 없으면 통과시킨다. 차단할 문장과 보완할 내용을 구체적으로 들 수 없으면 통과다.
 
 출력: 통과면 {{"ok": true}}, 차단이면 {{"ok": false, "reason": "<해당 문장 요약>: <무엇을 확인하거나 보완해 다시 답할지>"}}. reason은 한국어 두 문장 이내.
 
@@ -195,7 +204,8 @@ except Exception:
     # 판정기 호출이나 응답 해석이 실패하면 작업을 막지 않고 통과
     sys.exit(0)
 
-if verdict.get("ok") is False and verdict.get("reason"):
+# 판정기가 사유에 통과라고 적고 ok false를 낸 모순 응답은 차단 사유가 없는 것으로 보고 통과
+if verdict.get("ok") is False and verdict.get("reason") and not re.search(r"통과 대상|통과시킨다|통과한다|차단하지 않", str(verdict["reason"])):
     os.makedirs(os.environ["MARK_DIR"], exist_ok=True)
     with open(mark, "w", encoding="utf-8") as counter:
         counter.write(str(blocks + 1))

@@ -48,9 +48,17 @@ try:
         deferred = re.compile(pattern_file.read().strip())
 except Exception:
     deferred = None
+# 자기 판단의 원인 설명이나 사용자 의도처럼 도구로 확인할 대상이 아닌 문장은 미룸 판정에서 뺌(Claude판과 같은 공용 파일)
+try:
+    with open(os.environ["DEFERRED_PATTERN_FILE"].replace("deferred-claims-pattern", "deferred-claims-exempt-pattern"), encoding="utf-8") as exempt_file:
+        exempt_pattern = exempt_file.read().strip()
+        exempt = re.compile(exempt_pattern) if exempt_pattern else None
+except Exception:
+    exempt = None
 
 for sentence in re.split(r"(?<=[.!?])\s+|\n", text):
-    if (hedge.search(sentence) and unverified.search(sentence)) or (deferred and deferred.search(sentence)):
+    deferred_hit = deferred and deferred.search(sentence) and not (exempt and exempt.search(sentence))
+    if (hedge.search(sentence) and unverified.search(sentence)) or deferred_hit:
         block(
             "확인을 미룬 보고가 있습니다: " + sentence.strip()[:120]
             + " 지금 도구로 확인할 수 있으면 확인한 결과로 다시 보고하세요. 정말 확인할 수 없으면 막힌 이유와 확인 방법을 적으세요."

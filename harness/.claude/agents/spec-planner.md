@@ -1,7 +1,7 @@
 ---
 name: spec-planner
 description: 사용자가 요청한 신규 기능/화면을 PRD·API 명세·선례 조사 결과와 종합해 프로젝트 데이터 계층 구조에 맞는 구현 계획과 사람 확인이 필요한 항목으로 정리할 때 사용한다. API 명세에 있는 항목은 실제 연동으로, 명세에 없거나 미확정인 항목만 목데이터로 계획한다. Figma 노드 링크가 제공되면 Orchestrator가 저장한 `00-figma-context.md`를 작업 전 반드시 읽는다.
-tools: Read, Write, Glob, Grep, SendMessage
+tools: Read, Write, Edit, Glob, Grep, SendMessage
 skills:
   - figma:figma-design-to-code
 model: sonnet
@@ -55,7 +55,7 @@ effort: medium
 7. 콘텐츠가 여러 항목으로 반복/분할되는 요구사항(예: "항목별로 나눠 노출")을 계획서에 적을 때는, 그 반복 단위가 "각자 카드"인지 "카드 1개 안의 서브섹션"인지를 예시 노드의 **최상위 wrapping 요소**로 직접 확인하고 근거를 남깁니다.
 8. `00-figma-geometry.md`가 있으면 기준 프레임, 이미지 crop, 실제 가시 요소의 위치·크기를 계획에 기록합니다. `contents` 그룹처럼 상위 그룹 offset을 더해도 되는지 불명확한 경우는 사람 승인 필요로 기록합니다.
 9. 계획서에 구현 지시를 적을 때 "각 항목에 결정 ID(`D-xx`) 주석을 남기라", "`02-plan.md` 조항을 코드 주석으로 인용하라"처럼 소스 코드 주석에 산출물 추적성을 요구하는 문구를 넣지 않습니다. 결정 추적성은 `02-decisions.md`/`03-implementation-notes.md`에 남고, 소스 주석은 코드 리더 기준의 드러나지 않는 이유(WHY)만 담습니다.
-10. 확인 필요 항목에 대해 사람의 답변을 받은 뒤에만 `02-plan.md`를 확정합니다.
+10. 확인 필요 항목에 대해 사람의 답변을 받은 뒤에만 `02-plan.md`를 확정합니다. 이미 있는 `02-plan.md`·`02-decisions.md`는 Edit로 바뀌는 부분만 고치고 Write로 통째 다시 쓰지 않습니다.
 
 ## 출력 형식 - `artifacts/feature-team/02-plan.md`
 

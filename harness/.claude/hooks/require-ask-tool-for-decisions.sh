@@ -59,6 +59,8 @@ text = re.sub(r"```.*?```", "", answer, flags=re.S)
 text = re.sub(r"`[^`\n]*`", "", text)
 text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith(">"))
 
+# 번호·이름·경로처럼 값을 입력받는 요청은 고를 선택지가 없어 결정 질문에서 뺌
+text = re.sub(r"(번호|이름|브랜치명|경로|주소|값|ID|링크)(\s*\([^)]*\))?(을|를)\s?알려\s?주세요", "", text)
 if not re.search(r"(정해|골라|선택해|답해|알려)\s?주세요|까요\s*\?", text):
     sys.exit(0)
 

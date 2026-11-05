@@ -40,6 +40,24 @@ violations=$(printf '%s\n' "$last_text" \
 
 [ -z "$violations" ] && exit 0
 
+# 정규식은 "PRD" 단어만 보므로 작업 예고·차단 사례 설명처럼 PRD 내용을 주장하지 않는 줄도 잡음. 걸린 줄만 LLM으로 다시 판정해 주장인 줄만 남김
+# 판정 호출은 --safe-mode로 hooks를 끄고 환경변수로 재귀를 막으며, 호출·해석 실패는 정규식 결과를 그대로 씀
+if [ -z "${HARNESS_STOP_JUDGE:-}" ]; then
+	judged=$(printf '%s' "$violations" | python3 -c '
+import json, os, re, subprocess, sys
+lines = sys.stdin.read().splitlines()
+prompt = "아래 각 줄이 기획서(PRD) 원문에 적힌 내용·정책·수치를 사실로 주장하거나 PRD에 그런 내용이 없다고 주장하는 줄인지 판정한다. 앞으로 할 작업 예고, 항목 이름으로만 PRD를 언급한 줄, 과거 차단·응답 경위 설명, 다시 쓴다는 안내는 주장이 아니다. 확신이 없으면 주장으로 본다. 주장인 줄의 번호만 JSON 한 줄로 출력: {\"claims\": [1, 3]}\n\n" + "\n".join(f"{i + 1}. {line}" for i, line in enumerate(lines))
+try:
+    result = subprocess.run([os.environ.get("STOP_JUDGE_BIN", "claude"), "-p", "--safe-mode", "--model", "haiku", "--tools", "", "--no-session-persistence"], input=prompt, capture_output=True, text=True, timeout=60, env={**os.environ, "HARNESS_STOP_JUDGE": "1"})
+    claims = json.loads(re.search(r"\{.*\}", result.stdout, re.S).group(0))["claims"]
+    print("\n".join(lines[i - 1] for i in claims if isinstance(i, int) and 0 < i <= len(lines)))
+except Exception:
+    print("\n".join(lines))
+')
+	violations=$judged
+	[ -z "$violations" ] && exit 0
+fi
+
 reason="PRD를 언급하는 줄에 근거 출처 표기 누락:
 $violations
 
