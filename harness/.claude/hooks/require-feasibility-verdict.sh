@@ -48,7 +48,7 @@ if event == "PostToolUse":
     if os.path.exists(mark):
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PostToolUse",
-            "additionalContext": "가능 여부 질문 처리 중: 다음 메시지가 최종 답변이면 진행 안내 없이 가능합니다. 또는 불가능합니다.로 시작할 것. 둘째 문장부터도 범위가 나뉜다, 일부만 된다처럼 판정을 다시 쪼개지 말고, 단서는 판정을 유지한 조건으로만 덧붙일 것.",
+            "additionalContext": "질문 형식을 구분하세요. 확인 질문이면 네/아니요부터 답하고, 가능 여부 질문이면 아래 기존 규칙을 따르세요. 가능 여부 질문 처리 중: 다음 메시지가 최종 답변이면 진행 안내 없이 가능합니다. 또는 불가능합니다.로 시작할 것. 둘째 문장부터도 범위가 나뉜다, 일부만 된다처럼 판정을 다시 쪼개지 말고, 단서는 판정을 유지한 조건으로만 덧붙일 것.",
         }}, ensure_ascii=False))
     sys.exit(0)
 
@@ -60,19 +60,28 @@ if event != "Stop":
     if not prompt.strip() or re.fullmatch(r"\s*Another Claude session sent a message[^\n]*\s*", prompt):
         # 사용자 문장이 없는 보고 전달이면 진행 중인 질문의 표시를 지우지 않고 그대로 둠
         sys.exit(0)
+    confirmation_ending = re.search(r"(?:맞지|맞나요|맞습니까|아님|아니냐|아닌가요|했지|했나요|됐지|됐나요|끝났지|끝났나요)[.!?]?\s*$", prompt)
+    # 직접 이유 질문은 앞선 확인 질문의 답변 형식을 이어받지 않음
+    if re.match(r"\s*(?:(?:근데|그런데|그래서)\s*)?(?:왜|어째서)", prompt) and not confirmation_ending:
+        clear_mark()
+        sys.exit(0)
     keyword = re.search(r"가능|할 수 있|될 수 있|될까|되나|되냐|possible|feasible", prompt, re.I)
     # 키워드만 있는 작업 지시("가능하다로 대답해")는 질문이 아니므로 의문형까지 있어야 표시함
     question = re.search(
         r"\?|가능(성|\s?여부)[^.?!\n]*(검토|확인|판단|보고|알려)|가능(한지|할까|해|합니까|한가|하냐|하니|함)|(할|될) 수 있(는지|어|나|을까|니|냐|습니까)|될까|되나|되냐|되는지",
         prompt,
     )
+    confirmation = bool(confirmation_ending or re.search(r"\?", prompt))
+    feasibility = bool(keyword and question)
     if keyword:
         print("가능 여부 키워드 감지: 사용자가 가능한지 묻는 질문이면 최종 답변을 가능합니다. 또는 불가능합니다.로 시작할 것. 일부만 가능하다는 분할 판정, 진행 안내 문장, 얼버무림, 비교표로 시작 금지. 단서와 범위는 둘째 문장부터. 키워드를 언급만 한 메시지(작업 지시 등)면 해당 없음.")
+    elif confirmation:
+        print("확인 질문이면 네. 또는 아니요.부터 답하고 근거·진행 상황은 뒤에 설명하세요. 판단 근거가 없으면 확인할 수 없습니다.로 답하세요.")
     # 질문이 아닌 메시지는 표시를 지우지 않음
     # 작업 도중 들어온 다른 메시지가 표시를 지워 턴 끝 검사가 돌지 않던 문제를 막으려는 처리
     # 표시는 Stop에서 판정이 끝난 뒤(통과 또는 한 번 막은 뒤의 재응답)에만 지움
     # 작업 중에 들어온 질문도 함께 재판정하도록 후보 문장을 이어 붙여 둠
-    if keyword and question:
+    if feasibility or confirmation:
         mark_dir = os.environ["MARK_DIR"]
         os.makedirs(mark_dir, mode=0o700, exist_ok=True)
         directory = os.lstat(mark_dir)
@@ -87,7 +96,7 @@ if event != "Stop":
             sys.exit(0)
         os.fchmod(fd, 0o600)
         with os.fdopen(fd, "a", encoding="utf-8") as candidates:
-            candidates.write(prompt.strip() + "\n---\n")
+            candidates.write(json.dumps({"kind": "feasibility" if feasibility else "confirmation", "prompt": prompt.strip()}, ensure_ascii=False) + "\n")
     sys.exit(0)
 
 if not os.path.exists(mark):
@@ -99,13 +108,23 @@ if data.get("stop_hook_active") or not answer:
     clear_mark()
     sys.exit(0)
 
+try:
+    with open(mark, encoding="utf-8") as candidates:
+        request = json.loads(candidates.read().splitlines()[-1])
+    confirmation = request["kind"] == "confirmation"
+    user_prompt = request["prompt"]
+except (OSError, ValueError, IndexError, KeyError, TypeError):
+    clear_mark()
+    sys.exit(0)
+
 # 제목·강조·인용 기호를 걷어낸 뒤 답변 첫머리가 판정인지 봄
 # 사용자가 일부만 가능하다는 분할 판정을 금지하고 가능하다/불가능하다로만 답하라고 지시해 두 판정만 허용함
 body = re.sub(r"^[\s#*>-]+", "", answer)
-verdict = re.match(r"(불)?가능합니다", body)
+verdict = (re.match(r"(?:네|아니요|확인할 수 없습니다)(?=[\s,.!?*]|$)", body)
+           if confirmation else re.match(r"(불)?가능합니다", body))
 # 첫머리 판정 뒤에서 범위를 나누거나 일부만 된다고 다시 쪼개면 분할 판정이라, 후보 표현이 있을 때만 판정기에 함께 물음
 split_candidate = None
-if verdict:
+if verdict and not confirmation:
     opposing = r"(?<!불)가능(?:하지만|합니다)" if verdict.group(1) else r"불가능(?:하지만|합니다)"
     split_candidate = re.search(
         r"나뉩니다|나뉜다|나뉘어|나눠집니다|일부만|일부는|부분적으로|경우에 따라|항목마다 다르|항목별로 다르|" + opposing,
@@ -117,17 +136,20 @@ if verdict and not split_candidate:
 if verdict:
     problem = "첫머리 판정 뒤에서 범위를 나누거나 일부만 된다고 해 판정을 다시 쪼갰습니다."
 else:
-    problem = "답변이 가능합니다. 또는 불가능합니다.로 시작하지 않습니다."
-
-try:
-    with open(mark, encoding="utf-8") as candidates:
-        user_prompt = candidates.read().strip()
-except OSError:
-    user_prompt = ""
+    problem = ("답변이 네. 또는 아니요.로 시작하지 않습니다." if confirmation
+               else "답변이 가능합니다. 또는 불가능합니다.로 시작하지 않습니다.")
 
 judge_prompt = f"""아래 [사용자 메시지]에 사용자가 어떤 일이 가능한지(할 수 있는지, 될 수 있는지)를 직접 묻는 질문이 있는지 판정하고 JSON 한 줄만 출력한다.
 질문이 아닌 것: 이전 답변을 인용한 문장, "가능하다면 ~해"처럼 조건을 붙인 작업 지시, "가능한지 확인 후 진행해"처럼 확인을 작업 단계로 둔 지시, 가능 여부라는 말을 언급만 한 문장, 가능 여부가 아닌 다른 것을 묻는 질문.
 출력: 가능 여부 질문이 있으면 {{"ask": true}}, 없으면 {{"ask": false}}.
+
+[사용자 메시지]
+{user_prompt}
+"""
+if confirmation:
+    judge_prompt = f"""[사용자 메시지]가 네/아니요로 답할 수 있는 직접 확인 질문인지 판정해 JSON 한 줄로 출력한다.
+설명 요청, 작업 지시, 인용문, 에이전트 보고는 false다. 질문 대상이나 답변의 사실성은 판정하지 않는다.
+출력: {{"ask": true 또는 false}}
 
 [사용자 메시지]
 {user_prompt}
@@ -187,9 +209,10 @@ if asked is not True or (verdict and split is not True):
 
 print(json.dumps({
     "decision": "block",
-    "reason": "사용자가 가능 여부를 물었습니다. " + problem
+    "reason": ("사용자가 확인 질문을 했습니다. " + problem + " 네. 또는 아니요.부터 답한 뒤 설명하세요. 판단 근거가 없으면 확인할 수 없습니다.로 답하세요." if confirmation else
+    "사용자가 가능 여부를 물었습니다. " + problem
     + " 가능합니다. 또는 불가능합니다. 중 하나로 시작해 다시 답하세요. 일부만 가능하다는 분할 판정과 진행 안내로 시작하지 말고, 단서와 범위는 둘째 문장부터 쓰세요."
-    + " 단서는 판정을 유지한 채 조건(오탐 가능성, 전제, 작업 범위)으로만 덧붙이세요.",
+    + " 단서는 판정을 유지한 채 조건(오탐 가능성, 전제, 작업 범위)으로만 덧붙이세요."),
 }, ensure_ascii=False))
 '
 

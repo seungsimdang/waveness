@@ -249,6 +249,7 @@ for (const tool of ['.claude', '.codex']) {
 			prompt(execution);
 			assert.equal(edit('/repo/src/app/page.tsx'), false);
 		}
+
 		for (const report of ['청사진 보여줘', '수정 후 영향이 어떤지 판단하여 보고해', '커밋/푸시해도 되는지 판단하여 보고해']) {
 			prompt(report);
 			assert.equal(edit('/repo/src/app/page.tsx'), true);
@@ -494,6 +495,7 @@ test('클로드 에이전트 실행 훅이 fork 스폰과 worktree 진입, 격�
 
 	try {
 		spawnSync('git', ['init', '-q'], { cwd: fixture, env });
+
 		const isolation = (subagent_type, isolationValue) =>
 			claude(
 				'require-isolation-when-dirty',
@@ -502,6 +504,7 @@ test('클로드 에이전트 실행 훅이 fork 스폰과 worktree 진입, 격�
 			).status;
 
 		const agents = join(fixture, '.claude', 'agents');
+
 		mkdirSync(agents, { recursive: true });
 		writeFileSync(join(agents, 'implementer.md'), '---\nname: implementer\ntools: Read, Edit, Bash\n---\n');
 		writeFileSync(join(agents, 'reader.md'), '---\nname: reader\ntools: Read, Grep\n---\n');
@@ -706,6 +709,7 @@ for (const tool of ['.claude', '.codex']) {
 		try {
 			const answer = (judgeBin, message) => {
 				writeFileSync(join(marks, 'seen'), '');
+
 				const hook = input =>
 					spawnSync('sh', [resolve(H, tool, 'hooks', 'require-feasibility-verdict.sh')], {
 						input: JSON.stringify({ session_id: 's1', ...input }),
@@ -737,13 +741,16 @@ for (const tool of ['.claude', '.codex']) {
 			]) {
 				assert.equal(JSON.parse(answer(splitJudge, message)).decision, 'block');
 			}
+
 			for (const message of ['가능합니다. A도 가능합니다.', '불가능합니다. A도 불가능합니다.']) {
 				assert.equal(answer(splitJudge, message), '');
 				assert.equal(readFileSync(join(marks, 'seen'), 'utf8'), '');
 			}
+
 			const long = `가능합니다. ${'배경 설명입니다. '.repeat(400)}A는 가능하지만 B는 불가능합니다. 후속 문맥입니다.`;
 
 			assert.equal(JSON.parse(answer(splitJudge, long)).decision, 'block');
+
 			const seen = readFileSync(join(marks, 'seen'), 'utf8');
 
 			assert.ok(seen.includes('B는 불가능합니다. 후속 문맥입니다.'));
@@ -765,16 +772,19 @@ test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 �
 		chmodSync(judgeBin, 0o755);
 
 		const transcript = join(dir, 'transcript.jsonl');
+
 		const question = {
 			question: '주기는?',
 			multiSelect: false,
 			options: [{ label: '3초' }, { label: '5초' }]
 		};
+
 		const answer = value => ({
 			type: 'user',
 			message: { content: [{ type: 'tool_result', content: value }] },
 			toolUseResult: { questions: [question], answers: { '주기는?': value } }
 		});
+
 		const prompt = { type: 'user', uuid: 'u1', message: { content: '진행해' } };
 
 		const stop = (message, session, ...entries) => {
@@ -1186,6 +1196,7 @@ for (const tool of ['.claude', '.codex']) {
 				},
 				tmp
 			);
+
 			const context = JSON.parse(post()).hookSpecificOutput.additionalContext;
 
 			assert.ok(context.includes('가능합니다.'));
@@ -1231,6 +1242,7 @@ for (const tool of ['.claude', '.codex']) {
 				assert.equal(JSON.parse(stop(deferred)).decision, 'block');
 				assert.equal(stop(deferred, true), '');
 			}
+
 			assert.equal(stop('> 시험해 보기 전에는 확정할 수 없습니다.'), '');
 
 			for (const exempt of [
@@ -1275,6 +1287,7 @@ for (const tool of ['.claude', '.codex']) {
 // Claude 형식 transcript: 앞선 턴(도구 기록 A) → 이번 턴 사용자 질문 → 질문 창 직전 설명 텍스트 → 마지막 응답
 const writeTranscript = tmp => {
 	const path = join(tmp, 'transcript.jsonl');
+
 	const entries = [
 		{ type: 'user', uuid: 'u1', message: { content: '앞선 턴 지시' } },
 		{ type: 'assistant', message: { content: [{ type: 'tool_use', input: { command: 'git log -1 --format=%B OLDCOMMIT' } }] } },
@@ -1307,6 +1320,7 @@ test('클로드 미확인 판정 훅이 이번 턴 앞선 텍스트와 직전 �
 			cwd: H,
 			env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judgeBin }
 		});
+
 		const prompt = readFileSync(captured, 'utf8');
 
 		assert.equal(result.stdout, '');
@@ -1328,6 +1342,7 @@ for (const tool of ['.claude', '.codex']) {
 
 			return path;
 		};
+
 		const decide = (prompt, input, verdict, replies = ['기록하겠습니다.']) =>
 			withTmp('portfolio-answer-', tmp => {
 				const transcript = join(tmp, 'transcript.jsonl');
@@ -1341,7 +1356,9 @@ for (const tool of ['.claude', '.codex']) {
 						.map(entry => JSON.stringify(entry))
 						.join('\n')}\n`
 				);
+
 				const bin = judge(tmp, 'judge', verdict);
+
 				const call = () =>
 					spawnSync('sh', [resolve(H, tool, 'hooks', 'require-answer-before-edit.sh')], {
 						input: JSON.stringify({ session_id: 's1', transcript_path: transcript, ...input }),
@@ -1349,6 +1366,7 @@ for (const tool of ['.claude', '.codex']) {
 						cwd: H,
 						env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: bin }
 					}).stdout;
+
 				const first = call();
 				const parsed = first.trim() ? JSON.parse(first) : null;
 
@@ -1358,6 +1376,7 @@ for (const tool of ['.claude', '.codex']) {
 					called: existsSync(join(tmp, 'called'))
 				};
 			});
+
 		const edit = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'a.md' } };
 		const bash = command => ({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } });
 		const stop = { hook_event_name: 'Stop', last_assistant_message: '기록했습니다.' };
@@ -1443,7 +1462,9 @@ test('클로드 기획서 인용 훅이 소문자 경로 인용과 코드 펜스
 				env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judgeBin }
 			}).stdout;
 		};
+
 		const judgeBin = join(tmp, 'judge.sh');
+
 		const judge = output => {
 			writeFileSync(judgeBin, `#!/bin/sh\ncat >/dev/null\necho '${output}'\n`);
 			chmodSync(judgeBin, 0o755);
@@ -1462,5 +1483,78 @@ test('클로드 기획서 인용 훅이 소문자 경로 인용과 코드 펜스
 
 		judge('해석 불가');
 		assert.equal(JSON.parse(stop('집계 기준은 PRD에 따라 일 단위입니다.')).decision, 'block');
+	});
+});
+
+for (const tool of ['.claude', '.codex']) {
+	test(`${tool} 확인 질문은 직접 판정을 먼저 요구하고 설명 요청과 인용은 통과시킨다`, () => {
+		withTmp('harness-confirmation-', tmp => {
+			const judge = join(tmp, 'judge.sh');
+			const capture = join(tmp, 'prompt.txt');
+
+			writeFileSync(judge, `#!/bin/sh\ncat >"${capture}"\necho '{"ask": true}'\n`);
+			chmodSync(judge, 0o755);
+
+			const hook = input => spawnSync('sh', [resolve(H, tool, 'hooks/require-feasibility-verdict.sh')], {
+				input: JSON.stringify({ session_id: 'confirmation', ...input }),
+				encoding: 'utf8',
+				env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: judge }
+			});
+
+			const answer = text => {
+				hook({ hook_event_name: 'UserPromptSubmit', prompt: '관련 파일까지 정리한거 맞지?' });
+
+				return hook({ hook_event_name: 'Stop', last_assistant_message: text }).stdout;
+			};
+
+			for (const text of ['네. 정리했습니다.', '**아니요.** 남아 있습니다.', '확인할 수 없습니다.'])
+				assert.equal(answer(text), '');
+
+			assert.equal(JSON.parse(answer('아직 동기화 중입니다.')).decision, 'block');
+			assert.ok(readFileSync(capture, 'utf8').includes('직접 확인 질문'));
+			// 판정기가 잘못 true를 줘도 명확한 이유 질문은 이전 확인 표식을 지움.
+			hook({ hook_event_name: 'UserPromptSubmit', prompt: '이 내용을 내가 지시한적 있음?' });
+			assert.equal(hook({ hook_event_name: 'UserPromptSubmit', prompt: '근데 왜 todo에 추가함?' }).stdout, '');
+			assert.equal(hook({ hook_event_name: 'Stop', last_assistant_message: '로그 형식을 잘못 해석했기 때문입니다.' }).stdout, '');
+			assert.equal(JSON.parse(answer('정리했습니다.')).decision, 'block');
+			writeFileSync(judge, '#!/bin/sh\ncat >/dev/null\necho \'{"ask": false}\'\n');
+			hook({ hook_event_name: 'UserPromptSubmit', prompt: '왜 그렇게 판단했어?' });
+			assert.equal(hook({ hook_event_name: 'Stop', last_assistant_message: '당시 판단은 다음과 같습니다.' }).stdout, '');
+		});
+	});
+}
+
+test('코덱스 완료 주장 검사가 실제 JSONL의 최신 사용자 요청과 도구 근거를 전달한다', () => {
+	withTmp('harness-completion-evidence-', tmp => {
+		const bin = join(tmp, 'bin');
+		const capture = join(tmp, 'prompt.txt');
+		const transcript = join(tmp, 'transcript.jsonl');
+
+		mkdirSync(bin);
+		writeFileSync(join(bin, 'codex'), `#!/bin/sh\nwhile [ "$1" != "-o" ]; do shift; done\nout="$2"\ncat >"${capture}"\necho '{"ok": false, "reason": "남은 파일과 완료 주장이 다릅니다."}' >"$out"\n`);
+		chmodSync(join(bin, 'codex'), 0o755);
+		writeFileSync(transcript, [
+			{ type: 'response_item', payload: { role: 'user', content: [{ type: 'input_text', text: '이전 질문' }] } },
+			{ type: 'response_item', payload: { type: 'function_call_output', output: 'OLD-EVIDENCE' } },
+			{ type: 'response_item', payload: { role: 'user', content: [{ type: 'input_text', text: '관련 파일 전부 제거하고 TODO대로 동기화해' }] } },
+			{ type: 'response_item', payload: { type: 'function_call_output', output: 'CURRENT-RESIDUE: remaining.test.mjs' } },
+			{ type: 'response_item', payload: { role: 'assistant', content: [{ type: 'output_text', text: 'EARLIER-EXPLANATION' }] } },
+			{ type: 'response_item', payload: { role: 'user', content: [{ type: 'input_text', text: '<codex_internal_context>continue</codex_internal_context>' }] } }
+		].map(entry => JSON.stringify(entry)).join('\n'));
+
+		const result = spawnSync('sh', [resolve(H, '.codex/hooks/block-unverified-claims.sh')], {
+			input: JSON.stringify({ turn_id: 'completion', transcript_path: transcript, last_assistant_message: '모두 완료했습니다.' }),
+			encoding: 'utf8',
+			env: { ...env, TMPDIR: tmp, PATH: `${bin}:${env.PATH}` }
+		});
+
+		const prompt = readFileSync(capture, 'utf8');
+
+		assert.equal(JSON.parse(result.stdout).decision, 'block');
+		assert.ok(prompt.includes('관련 파일 전부 제거'));
+		assert.ok(prompt.includes('CURRENT-RESIDUE'));
+		assert.ok(prompt.includes('EARLIER-EXPLANATION'));
+		assert.ok(!prompt.includes('OLD-EVIDENCE'));
+		assert.ok(prompt.includes('허브 push나 PR 생성'));
 	});
 });
