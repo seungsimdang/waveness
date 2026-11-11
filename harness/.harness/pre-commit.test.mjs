@@ -121,17 +121,19 @@ test('추가 검사 실패는 lint·타입·하네스 검사보다 먼저 커밋
 		);
 		config(root, { identity: { name: '검사', email: 'check@example.com' } });
 
-		const previous = process.env.GIT_AUTHOR_EMAIL;
+		for (const key of ['GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL']) {
+			const previous = process.env[key];
 
-		process.env.GIT_AUTHOR_EMAIL = 'override@example.com';
-		try {
-			assert.throws(
-				() => runChecks(root, { execute: () => assert.fail('검사 실행 금지') }),
-				/신원 불일치/
-			);
-		} finally {
-			if (previous === undefined) delete process.env.GIT_AUTHOR_EMAIL;
-			else process.env.GIT_AUTHOR_EMAIL = previous;
+			process.env[key] = 'override@example.com';
+			try {
+				assert.throws(
+					() => runChecks(root, { execute: () => assert.fail('검사 실행 금지') }),
+					/신원 불일치/
+				);
+			} finally {
+				if (previous === undefined) delete process.env[key];
+				else process.env[key] = previous;
+			}
 		}
 	} finally {
 		rmSync(root, { recursive: true, force: true });
