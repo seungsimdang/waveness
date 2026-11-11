@@ -27,6 +27,7 @@ const commands = (value, label) => {
 };
 
 export function checkPlan(root) {
+	const file = join(root, '.harness/checks.json');
 	const hub =
 		existsSync(join(root, 'bin/harness.mjs')) &&
 		existsSync(join(root, 'harness/.harness')) &&
@@ -35,6 +36,7 @@ export function checkPlan(root) {
 	if (hub)
 		return {
 			hub: true,
+			identity: existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')).identity : undefined,
 			tasks: [
 				[
 					process.execPath,
@@ -48,8 +50,6 @@ export function checkPlan(root) {
 				]
 			]
 		};
-
-	const file = join(root, '.harness/checks.json');
 
 	if (!existsSync(file))
 		throw new Error('.harness/checks.json 없음: node .harness/install-checks.mjs 실행 필요');
@@ -152,7 +152,8 @@ export function runChecks(root, { ci = false, base, execute = command } = {}) {
 		if (
 			read('config', 'user.name') !== name ||
 			read('config', 'user.email') !== email ||
-			!read('var', 'GIT_AUTHOR_IDENT').startsWith(`${name} <${email}> `)
+			!read('var', 'GIT_AUTHOR_IDENT').startsWith(`${name} <${email}> `) ||
+			!read('var', 'GIT_COMMITTER_IDENT').startsWith(`${name} <${email}> `)
 		)
 			throw new Error(`커밋 신원 불일치: ${name} <${email}> 필요`);
 	}
