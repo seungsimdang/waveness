@@ -28,6 +28,7 @@ const commands = (value, label) => {
 
 export function checkPlan(root) {
 	const file = join(root, '.harness/checks.json');
+
 	const hub =
 		existsSync(join(root, 'bin/harness.mjs')) &&
 		existsSync(join(root, 'harness/.harness')) &&
