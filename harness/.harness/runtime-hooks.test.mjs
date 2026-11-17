@@ -999,6 +999,9 @@ test('AskUserQuestion 직접 입력 답변 뒤 같은 응답의 재질문을 차
 
 		assert.equal(decide(prompt, answer('best practice가 뭔데?')), 'deny');
 		assert.equal(decide(prompt, answer('지원, DB 공유')), 'allow');
+		// 질문 후보가 없는 직접 입력(작업 지시)은 허용
+		assert.equal(decide(prompt, answer('feat. 티켓 번호는 발급되지 않았어. 임시 브랜치 생성해')), 'allow');
+		assert.equal(decide(prompt, answer('지시대로 할게\n이거 왜 3초임')), 'deny');
 		assert.equal(decide(answer('best practice가 뭔데?'), prompt), 'allow');
 
 		// subagent의 수정은 사용자 답변과 무관하므로 허용
@@ -1343,7 +1346,7 @@ for (const tool of ['.claude', '.codex']) {
 			return path;
 		};
 
-		const decide = (prompt, input, verdict, replies = ['기록하겠습니다.']) =>
+		const decide = (prompt, input, verdict, replies = ['기록하겠습니다.'], next = input) =>
 			withTmp('portfolio-answer-', tmp => {
 				const transcript = join(tmp, 'transcript.jsonl');
 
@@ -1359,9 +1362,9 @@ for (const tool of ['.claude', '.codex']) {
 
 				const bin = judge(tmp, 'judge', verdict);
 
-				const call = () =>
+				const call = (hookInput = input) =>
 					spawnSync('sh', [resolve(H, tool, 'hooks', 'require-answer-before-edit.sh')], {
-						input: JSON.stringify({ session_id: 's1', transcript_path: transcript, ...input }),
+						input: JSON.stringify({ session_id: 's1', transcript_path: transcript, ...hookInput }),
 						encoding: 'utf8',
 						cwd: H,
 						env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: bin }
@@ -1372,7 +1375,7 @@ for (const tool of ['.claude', '.codex']) {
 
 				return {
 					result: parsed?.hookSpecificOutput?.permissionDecision ?? parsed?.decision ?? 'allow',
-					again: call().trim() ? 'block' : 'allow',
+					again: call(next).trim() ? 'block' : 'allow',
 					called: existsSync(join(tmp, 'called'))
 				};
 			});
@@ -1384,8 +1387,10 @@ for (const tool of ['.claude', '.codex']) {
 		const answered = `echo '{"unanswered": null}'`;
 		const question = '28-8462로 하면 되는데 뭐가 문제임?';
 
-		// 답하지 않은 질문은 같은 질문 묶음이 남아 있는 동안 수정마다 막음
-		assert.deepEqual(decide(question, edit, unanswered), { result: 'deny', again: 'block', called: true });
+		// 도구 호출 직전 응답 텍스트가 transcript에 빠질 수 있어 같은 질문 묶음의 수정은 1회만 막고 재시도는 통과
+		assert.deepEqual(decide(question, edit, unanswered), { result: 'deny', again: 'allow', called: true });
+		// 수정 차단 뒤에도 턴 끝 Stop 판정은 건너뛰지 않음
+		assert.deepEqual(decide(question, edit, unanswered, undefined, stop), { result: 'deny', again: 'block', called: true });
 		// 답한 질문 묶음은 한 번 통과하면 같은 턴에서 다시 판정하지 않음
 		assert.deepEqual(decide(question, edit, answered), { result: 'allow', again: 'allow', called: true });
 		// 의문형 후보가 없는 작업 지시는 판정기를 부르지 않음
@@ -1401,7 +1406,7 @@ for (const tool of ['.claude', '.codex']) {
 		// 판정기가 고장 나면 통과
 		assert.equal(decide(question, edit, 'echo broken').result, 'allow');
 		// 응답 기록이 없는 질문 턴도 편집 전 판정하고, 질문 없는 작업 지시는 통과
-		assert.deepEqual(decide(question, edit, unanswered, []), { result: 'deny', again: 'block', called: true });
+		assert.deepEqual(decide(question, edit, unanswered, []), { result: 'deny', again: 'allow', called: true });
 		assert.deepEqual(decide('D16 답변 기록해', edit, unanswered, []), { result: 'allow', again: 'allow', called: false });
 		assert.equal(decide(question, stop, unanswered, []).result, 'block');
 	});

@@ -1,6 +1,9 @@
 #!/bin/sh
 # PreToolUse(Edit·Write·NotebookEdit·Agent·SendMessage·AskUserQuestion) 훅: 마지막 사용자 메시지 이후 AskUserQuestion 답변에 선택지 밖 직접 입력이 있으면 같은 응답이 끝날 때까지 수정·위임·재질문 차단
-# 직접 입력은 대개 질문이고, 답변 직후 질문 창이 뜨면 답변 텍스트가 가려지므로 텍스트로 답하고 응답 종료를 유도. Read·Grep·Bash는 답변 조사용으로 허용
+# 직접 입력 속 질문은 답변 직후 질문 창이 뜨면 답변 텍스트가 가려지므로 텍스트로 답하고 응답 종료를 유도
+# Read·Grep·Bash는 답변 조사용으로 허용
+# 질문 후보가 없는 직접 입력(작업 지시, 값 전달)은 차단하지 않음
+# 후보 패턴은 require-answer-before-edit.sh의 QUESTION과 같게 유지
 # subagent 호출은 사용자 답변과 무관한 작업이라 제외
 # 트랜스크립트 형식이 바뀌거나 읽을 수 없으면 차단하지 않음
 # stop 인자 모드(Stop 훅): 같은 판정으로 차단이 풀려 있는데 마지막 응답이 "다음 메시지 후 질문 창으로 묻겠다"처럼 질문을 미루면 1회 차단
@@ -25,6 +28,7 @@ free_text=$(jq -n '
       | select($a != "")
       | (if $q.multiSelect then ($a | split(", ")[]) else $a end) as $p
       | select(any($q.options[]?; .label == $p) | not)
+      | select($p | test("\\?|왜|뭐|무엇|어떻게|어캐|어디|언제|누가|얼마|(냐|니|나요|까요|임|함)\\s*(\\n|$)"))
     ] | length > 0)
     else . end)
 ' "$transcript" 2>/dev/null)
