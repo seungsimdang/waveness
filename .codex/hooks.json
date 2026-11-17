@@ -33,6 +33,15 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/confirm-edit-on-report-request.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/delegation-wait.py\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/workflow-gate.py\"",
+            "timeout": 60
           }
         ]
       }
@@ -87,6 +96,28 @@
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/codex-tool-adapter.mjs\" require-answer-before-edit"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/delegation-wait.py\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/workflow-gate.py\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -95,6 +126,11 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/require-feasibility-verdict.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/workflow-gate.py\"",
+            "timeout": 60
           }
         ]
       },
@@ -188,6 +224,46 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/require-execution-for-declared-step.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/workflow-gate.py\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/delegation-wait.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/delegation-wait.py\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/delegation-wait.py\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/workflow-gate.py\"",
+            "timeout": 3
           }
         ]
       }
