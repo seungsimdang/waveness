@@ -28,7 +28,7 @@ test('공용 소스·문서 검사가 작업 트리 대신 인덱스 내용을 �
 		mkdirSync(join(fixture, 'src/app'), { recursive: true });
 		run('git', ['init', '-q']);
 		run('git', ['config', 'user.name', 'SeungHyun Lee']);
-		run('git', ['config', 'user.email', 'oak20005@naver.com']);
+		run('git', ['config', 'user.email', 'test@example.com']);
 		const source = join(fixture, 'src/app/page.tsx');
 		writeFileSync(source, 'export const text = "clean";\n');
 		run('git', ['add', 'src/app/page.tsx']);

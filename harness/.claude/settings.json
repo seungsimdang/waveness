@@ -95,6 +95,10 @@
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-answer-before-edit.sh\"",
 						"timeout": 90
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
 					}
 				]
 			},
@@ -118,6 +122,10 @@
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-answer-before-edit.sh\"",
 						"timeout": 90
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
 					}
 				]
 			},
@@ -161,6 +169,24 @@
 					{
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-reask-after-free-text-answer.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "TaskStop",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/confirm-task-stop.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write|NotebookEdit|Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-memory-request.sh\""
 					}
 				]
 			}

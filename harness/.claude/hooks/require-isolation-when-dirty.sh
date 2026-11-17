@@ -46,8 +46,9 @@ if any(line and ".claude/worktrees/" not in line for line in status.splitlines()
         "차단: 메인 작업 트리에 미커밋 변경이 있습니다. 격리 worktree는 커밋된 HEAD에서 만들어져\n"
         "이 변경을 볼 수 없습니다 (docs/agent-rules/git-safety.md).\n"
         "- 자신의 작업 변경이면: 브랜치의 작업 커밋에 `git add <경로> && git commit --amend --no-edit`로 합친 뒤 재시도\n"
-        "  (작업 커밋이 아직 없으면 itd-commit으로 첫 커밋 승인부터 받기)\n"
+        "  (작업 커밋이 아직 없으면 git-commit 스킬 기준 커밋 범위를 AskUserQuestion으로 사용자에게 요청하고 승인받은 뒤 커밋)\n"
         "- 자신이 만들지 않은 변경이면: 커밋하지 말고 사용자에게 보고\n"
+        "- 커밋 승인이 필요한 상황에서 사용자에게 요청하지 않고 계획을 바꾸지 말 것(스폰 대신 직접 수행하는 우회 금지)\n"
     )
     sys.exit(2)
 '

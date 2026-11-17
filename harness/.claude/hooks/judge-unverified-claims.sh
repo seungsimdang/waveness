@@ -1,8 +1,8 @@
 #!/bin/sh
 # Stop 훅(차단): 마지막 응답의 확인 미룸 표현을 정규식으로 턴마다 한 번 먼저 막고, 이어서 근거 없는 단정, 구체성 없는 확인 요청, 자기 행동 이유 질문에 원인 없이 경위만 답한 것을 LLM으로 판정해 턴 종료를 막음
-# type prompt 훅은 single-turn이라 도구 결과를 못 보고, stop_hook_active 재판정 지시를 판정 모델이 무시해 반복 차단한 사고가 있어 command 훅으로 감쌈
+# Stop 판정은 도구 근거와 재진입 상태를 함께 전달하는 command 훅으로 실행함
 # Stop은 if를 지원하지 않고 같은 이벤트 훅은 병렬 실행이라, 결정적 가드는 이 스크립트 안에서만 둘 수 있음
-# 가드는 stop_hook_active와 턴별 차단 횟수 상한이며, 플래그가 계속 false로 들어온 보고(anthropics/claude-code#54360)가 있어 횟수를 파일로도 셈
+# stop_hook_active와 파일에 저장한 턴별 차단 횟수 상한으로 재진입을 제한함
 # 판정 호출은 --safe-mode로 hooks를 끄고 환경변수로도 재귀를 막음(--bare는 구독 로그인을 쓰지 않아 제외)
 # 판정 실패·타임아웃·해석 불가는 통과시켜 판정기 고장이 작업을 멈추지 않게 함
 # Codex는 prompt 판정을 쓰지 않고 .codex/hooks/block-unverified-claims.sh 정규식 판정을 유지함
