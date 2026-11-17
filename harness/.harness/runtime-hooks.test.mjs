@@ -1,8 +1,8 @@
 // 포트폴리오 lint 테스트의 공용 훅 회귀 검사. 판정 CLI는 고정 응답으로 대체함
 
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -1755,7 +1755,7 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
  writeFileSync(join(project, '.harness/harness_edit_approval.py'), readFileSync(join(H, '.harness/harness_edit_approval.py')));
  const file = join(project, '.claude/hooks/new.sh');
  const data = {hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: {file_path: file, content: 'new'}};
- const hash = input => createHash('sha256').update(JSON.stringify({input: input.tool_input, tool: input.tool_name}, (key, value) => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value)).digest('hex');
+ const hash = input => createHash('sha256').update(JSON.stringify({input: input.tool_input, tool: input.tool_name}, (_key, value) => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value)).digest('hex');
  const plan = {id: 'test-plan', skill: 'harness-lab', root: project, changes: [{before_sha256: {[file]: 'absent'}, edit_sha256: hash(data)}]};
  const message = (role, text, codex = false) => codex ? {type: 'response_item', payload: {role, content: [{type: role === 'user' ? 'input_text' : 'output_text', text}]}} : {type: role, message: {content: text}};
  const blueprint = (value = plan, codex = false) => message('assistant', `<harness-plan>${JSON.stringify(value)}</harness-plan>`, codex);
@@ -1775,7 +1775,7 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
  assert.equal(call([blueprint(), message('user', '<hook_prompt>승인</hook_prompt>')]).status, 2);
  assert.equal(call([...approved, message('user', '승인 취소')]).status, 2);
  assert.equal(call([...approved, blueprint()]).status, 2);
- assert.equal(call([message('user', file + ' 수정해')]).status, 2);
+ assert.equal(call([message('user', `${file} 수정해`)]).status, 2);
  const patch = {...data, tool_name: 'apply_patch', tool_input: {command: '*** Begin Patch\n*** Add File: .codex/new.sh\n+new\n*** End Patch'}};
  const patchPlan = {...plan, changes: [{before_sha256: {[join(project, '.codex/new.sh')]: 'absent'}, edit_sha256: hash(patch)}]};
  assert.equal(call([blueprint(patchPlan, true), message('user', '승인', true)], patch).status, 0);
@@ -1787,7 +1787,7 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
 });
 
 for (const tool of ['.claude', '.codex']) test(`${tool} 질문 창의 질문 본문을 제외하고 선택 답만 판정`, () => {
- const prompt = '<send_user_message_question_reply>' + JSON.stringify([{answer: '위 diff 적용', question: '청사진을 검토하고 적용할까요?'}]) + '</send_user_message_question_reply>';
+ const prompt = `<send_user_message_question_reply>${JSON.stringify([{answer: '위 diff 적용', question: '청사진을 검토하고 적용할까요?'}])}</send_user_message_question_reply>`;
  const extract = prompt => spawnSync('sh', [join(H, tool, 'hooks/user-prompt-text.sh')], {input: JSON.stringify({prompt}), encoding: 'utf8'});
  assert.equal(extract(prompt).stdout.trim(), '위 diff 적용');
  const session_id = `question-answer-${tool}`;
