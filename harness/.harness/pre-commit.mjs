@@ -55,6 +55,16 @@ export function checkPlan(root) {
 		};
 	}
 
+	const tests = readdirSync(join(root, '.harness'))
+		.filter(name => name.endsWith('.test.mjs'))
+		.map(name => `.harness/${name}`);
+
+	if (!tests.length) throw new Error('공용 하네스 테스트 없음');
+
+	// 문서 전용 등 JS 도구가 없는 프로젝트는 lint·타입 검사 대상이 없어 하네스 테스트만 실행
+	if (!existsSync(file) && !existsSync(join(root, 'package.json')))
+		return { stagedTasks: new Set(), tasks: [[process.execPath, '--test', ...tests]] };
+
 	if (!existsSync(file))
 		throw new Error('.harness/checks.json 없음: node .harness/install-checks.mjs 실행 필요');
 
@@ -100,12 +110,6 @@ export function checkPlan(root) {
 	const stagedTasks = new Set(
 		entries.flatMap((entry, index) => (entry.staged === true ? [index] : []))
 	);
-
-	const tests = readdirSync(join(root, '.harness'))
-		.filter(name => name.endsWith('.test.mjs'))
-		.map(name => `.harness/${name}`);
-
-	if (!tests.length) throw new Error('공용 하네스 테스트 없음');
 
 	// 스테이징 파일만 보는 검사라 기존 위반이 있어도 변경하지 않은 파일은 차단하지 않음
 	const tailwind = existsSync(join(root, '.harness/check-tailwind-lint.mjs'))

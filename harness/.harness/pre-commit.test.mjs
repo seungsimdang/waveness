@@ -95,6 +95,19 @@ test('필수 설정·경고 차단·타입 검사가 없으면 성공으로 건�
 	}
 });
 
+test('package.json과 checks.json이 없는 프로젝트는 하네스 테스트만 실행', () => {
+	const root = fixture();
+
+	try {
+		rmSync(join(root, 'package.json'));
+		assert.deepEqual(checkPlan(root).tasks, [[process.execPath, '--test', '.harness/ok.test.mjs']]);
+		writeFileSync(join(root, 'package.json'), '{}');
+		assert.throws(() => checkPlan(root), /checks.json 없음/);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
 test('추가 검사 실패는 lint·타입·하네스 검사보다 먼저 커밋을 차단', () => {
 	const root = fixture();
 
