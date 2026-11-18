@@ -154,7 +154,7 @@ try:
 except Exception:
     deferred_exempt = None
 if deferred_pattern and not os.path.exists(deferred_mark):
-    for sentence in re.split(r"(?<=[.!?])\s+|\n|[,;]\s+|\s+(?:다만|하지만|그러나)\s+", deferred_text):
+    for sentence in re.split(r"(?<=[.!?])\s+|\n|[,;]\s+|\s+(?:다만|하지만|그러나)\s+|(?<=지만)\s+", deferred_text):
         if deferred_pattern.search(sentence) and not (deferred_exempt and deferred_exempt.search(sentence)) and not re.search(
             r"(?:권한|접근|인증|연결|서버|기기|계정)[^.!?]{0,24}(?:거부|실패|없어|없었|필요|불가|중단)", sentence
         ):

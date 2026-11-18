@@ -56,7 +56,7 @@ try:
 except Exception:
     exempt = None
 
-for sentence in re.split(r"(?<=[.!?])\s+|\n|[,;]\s+|\s+(?:다만|하지만|그러나)\s+", text):
+for sentence in re.split(r"(?<=[.!?])\s+|\n|[,;]\s+|\s+(?:다만|하지만|그러나)\s+|(?<=지만)\s+", text):
     deferred_hit = deferred and deferred.search(sentence) and not (exempt and exempt.search(sentence))
     if (hedge.search(sentence) and unverified.search(sentence)) or deferred_hit:
         block(

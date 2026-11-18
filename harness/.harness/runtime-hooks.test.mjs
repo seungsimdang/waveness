@@ -955,6 +955,8 @@ test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 �
 		assert.equal(existsSync(seen), true);
 
 		assert.equal(stop('권한이 없어 확인하지 못했습니다.', 's2'), '');
+		assert.equal(stop('권한이 거부되어 배포 상태를 아직 확인하지 않았습니다. 읽기 권한이 생기면 배포 콘솔에서 확인합니다.', 's12'), '');
+		assert.equal(JSON.parse(stop('제가 삭제 범위를 결정했지만 배포 상태는 아직 확인하지 않았습니다.', 's13')).decision, 'block');
 		assert.equal(stop('확인하지 않은 이유는 주석 한 줄을 결론으로 받아들였기 때문입니다.', 's6'), '');
 		assert.equal(stop('그래서 피그마대로가 어떤 화면을 뜻하는지 확정할 수 없습니다.', 's7'), '');
 		assert.ok(readFileSync(seen, 'utf8').includes('가장 마지막 결과를 기준으로'));
@@ -1413,7 +1415,7 @@ for (const tool of ['.claude', '.codex']) {
 
 			assert.equal(stop('> 시험해 보기 전에는 확정할 수 없습니다.'), '');
 			assert.equal(stop('문서에서 찾지 못해 근거는 없습니다.'), '');
-			assert.equal(JSON.parse(stop('제가 판단한 이유입니다만, 동작은 아직 확인하지 않았습니다.')).decision, 'block');
+			assert.equal(JSON.parse(stop('제가 삭제 범위를 결정했지만 배포 상태는 아직 확인하지 않았습니다.')).decision, 'block');
 
 			for (const exempt of [
 				'확인하지 않은 이유는 주석 한 줄을 결론으로 받아들였기 때문입니다.',

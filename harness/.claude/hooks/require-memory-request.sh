@@ -34,19 +34,26 @@ if data.get("tool_name") == "Bash":
     touched = any(m.group("path") and MEMORY.search(m.group("path").strip(chr(34) + chr(39)))
                   for m in REDIRECT.finditer(command))
     try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>\n")
         lexer.whitespace_split = True
+        lexer.whitespace = " \t\r"
         segments = [[]]
-        for token in lexer:
-            if token in (";", "&&", "||", "|", "&"):
+        tokens = iter(lexer)
+        for token in tokens:
+            if token in (";", "&&", "||", "|", "&") or "\n" in token and not token.strip(";&|\n"):
                 segments.append([])
+            elif re.fullmatch(r"[<>]+", token):
+                next(tokens, None)
             else:
                 segments[-1].append(token)
         for tokens in filter(None, segments):
             program, *args = tokens
             files = [arg for arg in args if not arg.startswith("-")]
             if program == "cp":
-                files = files[-1:]
+                target = next((arg.split("=", 1)[1] for arg in args if arg.startswith("--target-directory=")), None)
+                if not target:
+                    target = next((value for option, value in zip(args, args[1:]) if option in ("-t", "--target-directory")), None)
+                files = [target] if target else files[-1:]
             elif program not in ("mv", "touch", "tee") and not (program == "sed" and any(arg.startswith("-i") for arg in args)):
                 continue
             touched |= any(MEMORY.search(arg) for arg in files)
