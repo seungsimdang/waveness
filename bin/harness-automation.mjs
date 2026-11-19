@@ -42,7 +42,7 @@ const tokenFor = (repo) => {
 };
 
 const gh = (repo, ...args) => execFileSync("gh", args, {
-  encoding: "utf8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+  encoding: "utf8", timeout: 30000, maxBuffer: 1 << 25, stdio: ["pipe", "pipe", "pipe"],
   env: { ...process.env, ...(tokenFor(repo) && { GH_TOKEN: tokenFor(repo) }) },
 }).trim();
 const api = (repo, path) => JSON.parse(gh(repo, "api", `repos/${repo}${path ? `/${path}` : ""}`));

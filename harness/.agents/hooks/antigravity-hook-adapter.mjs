@@ -3,7 +3,7 @@
 // event: session-start | pre-tool-bash | pre-tool-edit | pre-tool-swarm | post-tool-edit | stop
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ADAPTER_DIR = dirname(fileURLToPath(import.meta.url));
@@ -34,11 +34,25 @@ function parseJsonSafe(text) {
 	}
 }
 
+function resolveTranscriptPath(transcriptPath) {
+	if (!transcriptPath) return '';
+
+	if (basename(transcriptPath) === 'transcript.jsonl') {
+		const fullPath = join(dirname(transcriptPath), 'transcript_full.jsonl');
+
+		if (existsSync(fullPath)) return fullPath;
+	}
+
+	return transcriptPath;
+}
+
 function extractLastAssistantMessage(transcriptPath) {
-	if (!transcriptPath || !existsSync(transcriptPath)) return '';
+	const resolvedPath = resolveTranscriptPath(transcriptPath);
+
+	if (!resolvedPath || !existsSync(resolvedPath)) return '';
 
 	try {
-		const lines = readFileSync(transcriptPath, 'utf8').trim().split('\n');
+		const lines = readFileSync(resolvedPath, 'utf8').trim().split('\n');
 
 		for (let i = lines.length - 1; i >= 0; i -= 1) {
 			const entry = parseJsonSafe(lines[i]);
@@ -131,7 +145,7 @@ function handlePreToolBash(input, hookName) {
 		tool_name: 'Bash',
 		tool_input: { command },
 		cwd: input.cwd || HARNESS_ROOT,
-		transcript_path: input.transcriptPath ?? '',
+		transcript_path: resolveTranscriptPath(input.transcriptPath),
 		session_id: input.conversationId ?? ''
 	};
 	const result = spawnSync('sh', [script], {
@@ -158,7 +172,7 @@ function toEditPayload(input, eventName) {
 				content: args.Content ?? args.content ?? ''
 			},
 			cwd: input.cwd || HARNESS_ROOT,
-			transcript_path: input.transcriptPath ?? '',
+			transcript_path: resolveTranscriptPath(input.transcriptPath),
 			session_id: input.conversationId ?? ''
 		};
 	}
@@ -172,7 +186,7 @@ function toEditPayload(input, eventName) {
 			new_string: args.Replacement ?? args.new_string ?? ''
 		},
 		cwd: input.cwd || HARNESS_ROOT,
-		transcript_path: input.transcriptPath ?? '',
+		transcript_path: resolveTranscriptPath(input.transcriptPath),
 		session_id: input.conversationId ?? ''
 	};
 }
@@ -234,11 +248,12 @@ function handleStop(input, hookName) {
 
 	if (!script) return { decision: 'allow' };
 
+	const resolvedTranscript = resolveTranscriptPath(input.transcriptPath);
 	const payload = {
 		hook_event_name: 'Stop',
 		last_assistant_message:
-			input.lastAssistantMessage ?? extractLastAssistantMessage(input.transcriptPath),
-		transcript_path: input.transcriptPath ?? '',
+			input.lastAssistantMessage ?? extractLastAssistantMessage(resolvedTranscript),
+		transcript_path: resolvedTranscript,
 		cwd: input.cwd || HARNESS_ROOT,
 		session_id: input.conversationId ?? '',
 		stop_hook_active: Boolean(input.continuationActive)

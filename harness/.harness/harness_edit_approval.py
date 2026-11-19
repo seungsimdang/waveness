@@ -12,11 +12,21 @@ def message(entry):
     answers = (entry.get("toolUseResult") or {}).get("answers")
     if isinstance(answers, dict):
         return "user", "\n".join(str(value) for value in answers.values())
+    entry_type = entry.get("type")
+    if entry_type == "PLANNER_RESPONSE":
+        content = entry.get("content")
+        return "assistant", content if isinstance(content, str) else ""
+    if entry_type == "USER_INPUT":
+        content = entry.get("content")
+        if not isinstance(content, str):
+            return "user", ""
+        req = re.search(r"<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>", content, re.S)
+        return "user", req.group(1) if req else content
     payload = entry.get("payload") or {}
     if payload.get("role"):
         role, content = payload["role"], payload.get("content", [])
     else:
-        role = entry.get("type")
+        role = entry_type
         content = (entry.get("message") or {}).get("content", [])
     if isinstance(content, str):
         return role, content
