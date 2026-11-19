@@ -1,4 +1,4 @@
-// 하네스 Claude·Codex 짝 일치 검사: 역할 본문·설명, 스킬 파일 집합, 훅 등록 파일 존재
+// 하네스 Claude·Codex·Antigravity 3자 짝 일치 검사: 역할 본문·설명, 스킬 파일 집합, 훅 등록 파일 존재
 // 실행: node --test .harness/spec.test.mjs (프로젝트는 commit-msg 훅의 check-scope.sh가, 허브는 pre-commit이 실행)
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -161,16 +161,23 @@ test('역할 명세에 필수 절·팀 통신 항목과 도구별 메타데이�
 	}
 });
 
-test('Antigravity 역할 카드가 Claude·Codex 역할 집합 및 effort와 일치함', () => {
-	assert.deepEqual(names('.agents/agents', '.json'), names('.codex/agents', '.toml'));
-	for (const role of names('.agents/agents', '.json')) {
-		const card = JSON.parse(read(`.agents/agents/${role}.json`));
+test('Antigravity 네이티브 역할 명세가 Claude·Codex 역할 집합·설명·본문과 일치함', () => {
+	assert.deepEqual(names('.agents/agents', '.json'), []);
+	assert.deepEqual(names('.agents/agents', '.md'), names('.claude/agents', '.md'));
+	for (const role of names('.agents/agents', '.md')) {
+		const [, front, ...rest] = read(`.agents/agents/${role}.md`).split(/^---$/m);
+		const [, claudeFront, ...claudeRest] = read(`.claude/agents/${role}.md`).split(/^---$/m);
 		const toml = read(`.codex/agents/${role}.toml`);
-		const effort = toml.match(/^model_reasoning_effort = "([^"\n]+)"$/m)[1];
-		assert.equal(card.role, role, role);
-		assert.equal(card.runtime, 'antigravity-swarm', role);
-		assert.match(card.model, new RegExp(`-${effort}$`), `${role}: ${card.model} vs ${effort}`);
-		assert.ok(existsSync(join(H, card.instructions_ref)), `${role}: ${card.instructions_ref}`);
+		const claudeDescription = claudeFront.match(/^description: (.*)$/m)[1];
+		const tomlBody = toml.match(/^developer_instructions = """\n([\s\S]*?)"""$/m)[1];
+		assert.match(front, new RegExp(`^name: ${role}$`, 'm'), role);
+		assert.equal(front.match(/^description: (.*)$/m)?.[1], claudeDescription, role);
+		assert.equal(roleBody(rest.join('---')), roleBody(claudeRest.join('---')), role);
+		assert.equal(roleBody(rest.join('---')), roleBody(tomlBody), role);
+		assert.match(front, /^model: (?:inherit|flash_lite|flash|pro)$/m, role);
+		assert.match(front, /^swarm_model: \S+-(?:low|medium|high|xhigh)$/m, role);
+		assert.match(front, /^subagent: true$/m, role);
+		assert.match(front, /^tools:\n(?:\s+-\s+\S+\n)+/m, role);
 	}
 });
 

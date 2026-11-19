@@ -1,6 +1,0 @@
-{
-  "role": "spec-planner",
-  "runtime": "antigravity-swarm",
-  "model": "gemini-4-hydrogen-medium",
-  "instructions_ref": ".codex/agents/spec-planner.toml"
-}

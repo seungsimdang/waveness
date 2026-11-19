@@ -292,16 +292,20 @@ test("자동 PR 받기는 기존 모델·effort를 반복 업데이트에서도 
   try {
     const codex = ".codex/agents/model-fixture.toml";
     const claude = ".claude/agents/model-fixture.md";
+    const agy = ".agents/agents/model-fixture.md";
     const role = (model, effort, body) => `model = "${model}"\nmodel_reasoning_effort = "${effort}"\ndeveloper_instructions = """\nmodel = "${body}"\n"""\n`;
     const agent = (model, effort, body) => `---\nmodel: ${model}\neffort: ${effort}\n---\nmodel: ${body}\n`;
+    const agyAgent = (model, swarmModel, body) => `---\nname: model-fixture\nmodel: ${model}\nswarm_model: ${swarmModel}\n---\nmodel: ${body}\n`;
     writeFileSync(join(hub, "harness", codex), role("project-model", "medium", "원래 본문"));
     writeFileSync(join(hub, "harness", claude), agent("project-model", "medium", "원래 본문"));
+    writeFileSync(join(hub, "harness", agy), agyAgent("pro", "gemini-4-hydrogen-medium", "원래 본문"));
     git(hub, "add", "."); commit(hub, "test: 기존 모델");
     run(hub, "pull", project);
     git(project, "add", "."); commit(project, "test: 연결", "Harness-Scope: sync");
     for (const body of ["첫 업데이트", "둘째 업데이트"]) {
       writeFileSync(join(hub, "harness", codex), role(`hub-${body}`, "high", body));
       writeFileSync(join(hub, "harness", claude), agent(`hub-${body}`, "high", body));
+      writeFileSync(join(hub, "harness", agy), agyAgent("inherit", "gemini-4-hydrogen-high", body));
       git(hub, "add", "."); commit(hub, "test: 공용 변경");
       const result = spawnSync(process.execPath, [join(hub, "bin/harness.mjs"), "pull", project], {
         env: { ...ENV, HARNESS_PRESERVE_PROJECT_MODELS: "1" }, encoding: "utf8",
@@ -309,6 +313,7 @@ test("자동 PR 받기는 기존 모델·effort를 반복 업데이트에서도 
       assert.equal(result.status, 0, result.stderr);
       assert.equal(read(project, codex), role("project-model", "medium", body));
       assert.equal(read(project, claude), agent("project-model", "medium", body));
+      assert.equal(read(project, agy), agyAgent("pro", "gemini-4-hydrogen-medium", body));
       git(project, "add", "."); commit(project, "test: 받기", "Harness-Scope: sync");
     }
   } finally { rmSync(root, { recursive: true, force: true }); }

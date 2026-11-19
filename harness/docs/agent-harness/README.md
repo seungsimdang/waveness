@@ -2,11 +2,11 @@
 
 ## 시작점과 명세
 
-Codex·Gemini(Antigravity)는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시작한다. Feature Team 역할 4개(prior-art-researcher·spec-planner·implementer·integration-reviewer)와 스킬 6종은 절차·책임·금지사항·산출물 계약을 갖춘다. Antigravity는 `.agents/skills/`, `.agents/hooks.json`, 역할별 `.agents/agents/{role}.json`(`swarm` 모델)을 사용한다. 팀 실행은 `swarm`, 단발성 코드베이스 조사는 `invoke_subagent(research)`로 분리한다.
+Codex·Gemini(Antigravity)는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시작한다. Feature Team 역할 4개(prior-art-researcher·spec-planner·implementer·integration-reviewer)와 스킬 6종은 절차·책임·금지사항·산출물 계약을 갖춘다. Antigravity는 `.agents/skills/`, `.agents/hooks.json`, 네이티브 `.agents/agents/{role}.md`(`model` 티어 + `swarm_model`)를 사용한다. 팀 실행은 `swarm`(`PreToolUse` 훅이 명세 참조와 `swarm_model` 검증), 단발성 코드베이스 조사는 `invoke_subagent(research)`, 필요 시 네이티브 역할 서브에이전트는 `invoke_subagent(TypeName: "<role>")`로 분리한다.
 
 ## 원본과 동기화
 
-`.claude/`, `.codex/`, `.agents/`의 실제 파일이 원본이다. 별도 템플릿이나 생성 단계는 두지 않는다. 역할·스킬을 고치면 Claude판과 Codex/Antigravity 공용판(`.agents/skills/`)을 같은 변경에서 함께 고친다. 역할 본문과 설명은 두 판이 같아야 하고, 스킬은 두 폴더의 파일 집합이 같아야 한다(waveness `bin/spec.test.mjs`).
+`.claude/`, `.codex/`, `.agents/`의 실제 파일이 원본이다. 별도 템플릿이나 생성 단계는 두지 않는다. 역할·스킬을 고치면 Claude판(`.claude/agents/`·`.claude/skills/`), Codex판(`.codex/agents/`), Antigravity판(`.agents/agents/`·`.agents/skills/`)을 같은 변경에서 함께 고친다. 역할 본문과 설명은 세 판이 같아야 하고, 스킬은 두 폴더의 파일 집합이 같아야 한다(waveness `bin/spec.test.mjs`).
 
 이 하네스는 회사 공용 하네스 저장소(waveness)에서 받아온 것이다. 공용 하네스와 주고받는 규칙, `Harness-Scope` 커밋 줄, 프로젝트 소유 파일은 `sync.md`를 따른다. 훅 스크립트와 훅 등록은 waveness가 seungness와도 주고받는다(`sync.md`의 "seungness 훅 동기화").
 

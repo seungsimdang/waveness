@@ -1,8 +1,8 @@
 // Antigravity(Gemini) 훅 입력(camelCase)을 Claude·Codex 공용 훅 형식으로 변환해 실행하는 어댑터
 // 사용법: node .agents/hooks/antigravity-hook-adapter.mjs <event> <hook-name> (stdin JSON)
-// event: session-start | pre-tool-bash | pre-tool-edit | post-tool-edit | stop
+// event: session-start | pre-tool-bash | pre-tool-edit | pre-tool-swarm | post-tool-edit | stop
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -270,6 +270,52 @@ function handleStop(input, hookName) {
 	return { decision: 'allow' };
 }
 
+function handlePreToolSwarm(input) {
+	const args = input.toolCall?.args ?? {};
+
+	if (args.action !== 'add') return { decision: 'allow' };
+
+	const agentsDir = join(HARNESS_ROOT, '.agents/agents');
+
+	if (!existsSync(agentsDir)) return { decision: 'allow' };
+
+	const roles = readdirSync(agentsDir)
+		.filter(file => file.endsWith('.md'))
+		.map(file => file.slice(0, -3))
+		.sort((a, b) => b.length - a.length);
+	const workerName = String(args.name ?? '');
+	const matchedRole = roles.find(
+		role =>
+			workerName === role ||
+			(workerName.startsWith(`${role}-`) && /^\d+$/.test(workerName.slice(role.length + 1))) ||
+			workerName.endsWith(`-${role}`)
+	);
+
+	if (!matchedRole) return { decision: 'allow' };
+
+	const expectedRef = `.agents/agents/${matchedRole}.md`;
+	const specContent = readFileSync(join(agentsDir, `${matchedRole}.md`), 'utf8');
+	const frontmatter = specContent.split(/^---$/m)[1] ?? '';
+	const expectedModel = frontmatter.match(/^swarm_model:\s*(\S+)\s*$/m)?.[1];
+	const brief = String(args.brief ?? '');
+
+	if (!brief.includes(expectedRef)) {
+		return {
+			decision: 'deny',
+			reason: `swarm(action: "add") 호출 시 brief에 ${expectedRef} 경로 참조와 작업 전 필수 읽기 지시를 포함해야 합니다.`
+		};
+	}
+
+	if (expectedModel && args.model !== expectedModel) {
+		return {
+			decision: 'deny',
+			reason: `역할 ${matchedRole}의 swarm 모델은 ${expectedRef}의 swarm_model(${expectedModel})과 일치해야 합니다 (현재: ${args.model || '미지정'}).`
+		};
+	}
+
+	return { decision: 'allow' };
+}
+
 const [, , event, hookName] = process.argv;
 const input = readJsonStdin();
 let output = {};
@@ -283,6 +329,9 @@ switch (event) {
 		break;
 	case 'pre-tool-edit':
 		output = handlePreToolEdit(input, hookName);
+		break;
+	case 'pre-tool-swarm':
+		output = handlePreToolSwarm(input);
 		break;
 	case 'post-tool-edit':
 		output = handlePostToolEdit(input, hookName);

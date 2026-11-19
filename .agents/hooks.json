@@ -51,6 +51,15 @@
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-harness-lab-before-harness-edit"
           }
         ]
+      },
+      {
+        "matcher": "swarm",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-swarm verify-swarm-role"
+          }
+        ]
       }
     ],
     "PostToolUse": [

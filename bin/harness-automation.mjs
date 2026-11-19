@@ -350,11 +350,11 @@ export function mergeReady(repo, base, allowed, source, call = gh, restrictVerce
   }
 }
 
-const hubAllowed = (path) => path.startsWith("harness/") || [".claude/settings.json", ".codex/hooks.json"].includes(path);
+const hubAllowed = (path) => path.startsWith("harness/") || [".claude/settings.json", ".codex/hooks.json", ".agents/hooks.json"].includes(path);
 
 function regenerate(hub) {
   execFileSync(process.execPath, [join(hub, "bin/hub-hooks.mjs")], { cwd: hub, stdio: "pipe" });
-  const configs = [".claude/settings.json", ".codex/hooks.json"];
+  const configs = [".claude/settings.json", ".codex/hooks.json", ".agents/hooks.json"];
   if (!git(hub, "status", "--porcelain", "--", ...configs)) return;
   git(hub, "add", "--", ...configs);
   git(hub, "commit", "-q", "-m", "chore(hooks): 허브 훅 등록 갱신", "-m", "Harness-Scope: sync");

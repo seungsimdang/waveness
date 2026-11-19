@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-11-19 feat(harness): Antigravity 역할 카드 네이티브 Markdown 전환, swarm 검증 훅 추가 및 effort medium 통일
+
+> - `.agents/agents/*.json`을 Antigravity 네이티브 `.agents/agents/{role}.md`(`model: inherit`, `swarm_model: gemini-4-hydrogen-medium`, `subagent: true`, `tools:`, `integration-reviewer` `inheritMcp: true`, Claude·Codex 동일 본문)로 전환
+> - `prior-art-researcher`의 Claude `effort`·Codex `model_reasoning_effort`·Antigravity `swarm_model`을 모두 `medium`으로 통일
+> - `.agents/hooks.json` 및 `antigravity-hook-adapter.mjs`에 `PreToolUse(matcher: "swarm")` 훅을 추가하고 `check-agent-harness-sync.sh`·`spec.test.mjs`·`bin/harness.mjs`·`bin/harness-automation.mjs`를 3자 기준으로 갱신
+
 ## 2026-11-05 fix(harness): 한화 공용 역할 지침 동기화 충돌 해결
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@d94a44ecc24c8204049e75b2e92f7defdd73387d`

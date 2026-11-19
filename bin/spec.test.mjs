@@ -1,4 +1,4 @@
-// harness/의 Claude·Codex 짝 일치 검사: 역할 본문·설명, 스킬 파일 집합, 훅 등록 파일 존재
+// harness/의 Claude·Codex·Antigravity 3자 짝 일치 검사: 역할 본문·설명, 스킬 파일 집합, 훅 등록 파일 존재
 // 실행: node --test bin/*.test.mjs
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -16,16 +16,21 @@ const walk = (dir) =>
 
 const roleBody = (body) => body.replaceAll("`CLAUDE.md` · ", "").replaceAll(".claude/skills/", ".agents/skills/").trim();
 
-test("역할은 Claude판과 Codex판의 집합·설명·본문이 같음", () => {
+test("역할은 Claude판·Codex판·Antigravity판의 집합·설명·본문이 같음", () => {
   assert.deepEqual(names(".claude/agents", ".md"), names(".codex/agents", ".toml"));
+  assert.deepEqual(names(".agents/agents", ".json"), []);
+  assert.deepEqual(names(".agents/agents", ".md"), names(".claude/agents", ".md"));
   for (const role of names(".claude/agents", ".md")) {
     const [, front, ...rest] = read(`.claude/agents/${role}.md`).split(/^---$/m);
+    const [, agyFront, ...agyRest] = read(`.agents/agents/${role}.md`).split(/^---$/m);
     const toml = read(`.codex/agents/${role}.toml`);
     const description = front.match(/^description: (.*)$/m)[1];
     assert.equal(JSON.parse(toml.match(/^description = (".*")$/m)[1]), description, role);
+    assert.equal(agyFront.match(/^description: (.*)$/m)?.[1], description, role);
     const body = toml.match(/^developer_instructions = """\n([\s\S]*?)"""$/m)[1];
-    // Codex는 CLAUDE.md를 읽지 않아 Claude판에만 있는 참조는 비교에서 뺌
+    // Codex·Antigravity는 CLAUDE.md를 읽지 않아 Claude판에만 있는 참조는 비교에서 뺌
     assert.equal(roleBody(rest.join("---")), roleBody(body), role);
+    assert.equal(roleBody(agyRest.join("---")), roleBody(body), role);
   }
 });
 

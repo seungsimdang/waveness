@@ -61,6 +61,15 @@
             "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-harness-lab-before-harness-edit"
           }
         ]
+      },
+      {
+        "matcher": "swarm",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-swarm verify-swarm-role"
+          }
+        ]
       }
     ],
     "PostToolUse": [
