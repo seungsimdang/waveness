@@ -1,6 +1,8 @@
-# Claude-Codex 공유 산출물 하네스
+# Claude · Codex · Gemini 공유 산출물 하네스
 
-Claude와 Codex는 각 도구의 기존 Agent, Skill, Team 흐름으로 독립적으로 작업하고, 다른 도구 또는 새 세션이 실제로 이어받아야 할 때만 파일 기반 인계 계약을 사용한다.
+Claude, Codex, Gemini(Antigravity)는 각 도구의 기존 Agent, Skill, Team 흐름으로 독립적으로 작업하고, 다른 도구 또는 새 세션이 실제로 이어받아야 할 때만 파일 기반 인계 계약을 사용한다.
+
+> 기존 문서 링크 호환을 위해 파일명(`claude-codex-shared-harness.md`)은 유지한다.
 
 ## 목차
 

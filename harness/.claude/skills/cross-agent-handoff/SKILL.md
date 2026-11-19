@@ -1,6 +1,6 @@
 ---
 name: cross-agent-handoff
-description: Claude 작업을 Codex 또는 다음 세션이 실제로 이어받도록 공용 상태·인계 파일을 작성하거나 갱신할 때 사용한다. 모델 전환 없는 작업에는 사용하지 않는다.
+description: Claude 작업을 Codex, Gemini(Antigravity) 또는 다음 세션이 실제로 이어받도록 공용 상태·인계 파일을 작성하거나 갱신할 때 사용한다. 모델 전환 없는 작업에는 사용하지 않는다.
 ---
 
 # Cross-Agent Handoff
@@ -11,7 +11,7 @@ description: Claude 작업을 Codex 또는 다음 세션이 실제로 이어받�
 
 ## 사용 조건
 
-- 사용: Claude → Codex, Codex → Claude 전환, 같은 도구라도 새 세션이 이어받아야 할 때
+- 사용: Claude · Codex · Gemini(Antigravity) 간 전환, 같은 도구라도 새 세션이 이어받아야 할 때
 - 사용하지 않음: 같은 세션에서 계속 작업, 단순 진행 보고, 일반 구현·리뷰
 
 ## 입력

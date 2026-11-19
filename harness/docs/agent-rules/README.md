@@ -1,9 +1,9 @@
 # 공용 에이전트 규칙
 
-Claude와 Codex는 코드·문서·Git 작업 전에 이 폴더에서 현재 작업과 관련된 규칙을 읽는다. 이 문서는 공용 규칙의 단일 원본이며, 도구별 권한·Hook·Agent 설정은 `.claude/`, `.codex/`에 둔다.
+Claude, Codex, Gemini(Antigravity)는 코드·문서·Git 작업 전에 이 폴더에서 현재 작업과 관련된 규칙을 읽는다. 이 문서는 공용 규칙의 단일 원본이며, 도구별 권한·Hook·Agent 설정은 `.claude/`, `.codex/`, `.agents/`에 둔다.
 
 - Claude: `.claude/rules/`의 심볼릭 링크로 자동 로드된다. `paths:`가 있는 규칙은 해당 경로 파일을 다룰 때, 나머지는 세션 시작 시 로드된다.
-- Codex: 아래 표의 읽는 시점에 맞춰 직접 읽는다.
+- Codex · Gemini(Antigravity): 아래 표의 읽는 시점에 맞춰 직접 읽는다. Antigravity는 `AGENTS.md`와 `.agents/skills/`, `.agents/hooks.json`을 네이티브로 로드한다.
 - 새 규칙 파일을 추가하면 `.claude/rules/`에 심볼릭 링크도 만든다: `ln -s ../../docs/agent-rules/{name}.md .claude/rules/`
 
 | 규칙 | 읽는 시점 |

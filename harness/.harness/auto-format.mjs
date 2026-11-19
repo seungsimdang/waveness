@@ -6,6 +6,13 @@ import { formatBuffer } from './biome-check.mjs';
 import { fixFiles } from './check-tailwind-lint.mjs';
 
 export function editedFiles(input) {
+	if (input.toolCall) {
+		const name = input.toolCall.name?.split('.').at(-1);
+		const file = input.toolCall.args?.Path ?? input.toolCall.args?.file_path;
+
+		return ['edit_file', 'write_file'].includes(name) && file ? [file] : [];
+	}
+
 	const args = input.tool_input ?? {};
 	const tool = input.tool_name?.split('.').at(-1);
 
@@ -26,6 +33,7 @@ export function editedFiles(input) {
 }
 
 const failed = input =>
+	Boolean(input.error) ||
 	input.tool_response?.error ||
 	input.tool_response?.isError ||
 	input.tool_response?.success === false;

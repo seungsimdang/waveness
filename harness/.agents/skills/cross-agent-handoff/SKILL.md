@@ -1,6 +1,6 @@
 ---
 name: cross-agent-handoff
-description: Claude와 Codex 또는 서로 다른 세션 사이에 실제로 작업을 넘길 때 사용한다. "Codex에게 넘겨", "Claude가 이어서", "다른 AI가 계속", "인계 문서 갱신"이 트리거다. 모델 전환 없는 작업, 단순 진행 보고, 일반 구현·리뷰에는 사용하지 않는다.
+description: Claude, Codex, Gemini(Antigravity) 또는 서로 다른 세션 사이에 실제로 작업을 넘길 때 사용한다. "Codex에게 넘겨", "Claude가 이어서", "Gemini에게 넘겨", "Antigravity가 이어서", "다른 AI가 계속", "인계 문서 갱신"이 트리거다. 모델 전환 없는 작업, 단순 진행 보고, 일반 구현·리뷰에는 사용하지 않는다.
 ---
 
 # Cross-Agent Handoff
@@ -11,7 +11,7 @@ description: Claude와 Codex 또는 서로 다른 세션 사이에 실제로 작
 
 ## 사용 조건
 
-- 사용: Claude → Codex, Codex → Claude 전환, 같은 도구라도 새 세션이 이어받아야 할 때
+- 사용: Claude · Codex · Gemini(Antigravity) 간 전환, 같은 도구라도 새 세션이 이어받아야 할 때
 - 사용하지 않음: 같은 세션에서 계속 작업, 단순 진행 보고, 일반 구현·리뷰
 
 ## 입력
