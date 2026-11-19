@@ -1,0 +1,6 @@
+{
+  "role": "prior-art-researcher",
+  "runtime": "antigravity-swarm",
+  "model": "gemini-4-hydrogen-high",
+  "instructions_ref": ".codex/agents/prior-art-researcher.toml"
+}

@@ -70,7 +70,13 @@ export async function loadChecker(root) {
 
 	if (!existsSync(manifest)) return skip('Tailwind 미설치');
 
-	const { version } = JSON.parse(readFileSync(manifest, 'utf8'));
+	let version;
+
+	try {
+		({ version } = JSON.parse(readFileSync(manifest, 'utf8')));
+	} catch {
+		return skip('Tailwind package.json 해석 실패');
+	}
 
 	if (Number.parseInt(version, 10) < 4) return skip(`Tailwind ${version} 미지원`);
 

@@ -1,0 +1,6 @@
+{
+  "role": "integration-reviewer",
+  "runtime": "antigravity-swarm",
+  "model": "gemini-4-hydrogen-medium",
+  "instructions_ref": ".codex/agents/integration-reviewer.toml"
+}

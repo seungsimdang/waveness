@@ -2,7 +2,7 @@
 
 ## 시작점과 명세
 
-Codex·Gemini(Antigravity)는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시작한다. Feature Team 역할 4개(prior-art-researcher·spec-planner·implementer·integration-reviewer)와 스킬 6종은 절차·책임·금지사항·산출물 계약을 갖춘다. Antigravity는 `.agents/skills/`와 `.agents/hooks.json`을 네이티브로 사용한다.
+Codex·Gemini(Antigravity)는 `AGENTS.md`, Claude는 `CLAUDE.md`(`AGENTS.md`를 불러옴)에서 시작한다. Feature Team 역할 4개(prior-art-researcher·spec-planner·implementer·integration-reviewer)와 스킬 6종은 절차·책임·금지사항·산출물 계약을 갖춘다. Antigravity는 `.agents/skills/`, `.agents/hooks.json`, 역할별 `.agents/agents/{role}.json`(`swarm` 모델)을 사용한다.
 
 ## 원본과 동기화
 

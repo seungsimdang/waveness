@@ -121,12 +121,12 @@
 | `pr-create` | 대표 커밋 기반 PR 작성·생성·갱신, 본인 Assignee·기존 라벨 설정 |
 | `finding-validity-gate` | 코드리뷰 finding 일괄 반영 |
 | `coderabbit-triage` | CodeRabbit 리뷰 실행과 지적 선별 반영 |
-| `cross-agent-handoff` | Claude·Codex 또는 세션 사이 작업 인계 |
+| `cross-agent-handoff` | Claude·Codex·Gemini(Antigravity) 또는 세션 사이 작업 인계 |
 | `harness-lab` | 하네스 신규 설계, 점검·개선, drift 확인 |
 
-## Claude-Codex 인계 계약
+## 모델 간 인계 계약 (Claude · Codex · Gemini)
 
-- Claude와 Codex는 각자의 기존 Skill·Agent 흐름으로 작업한다.
+- Claude, Codex, Gemini(Antigravity)는 각자의 기존 Skill·Agent 흐름으로 작업한다. Antigravity는 `AGENTS.md`, `.agents/skills/`, `.agents/hooks.json`을 네이티브로 사용하며, 서브에이전트 실행 시 `.agents/agents/{role}.json`의 `model`로 `swarm(action: "add")`를 호출한다.
 - 모델 또는 세션을 실제로 전환할 때만 `artifacts/work/<work-id>/STATUS.md`와 `HANDOFF.md`를 갱신한다. 대화만으로 다음 모델에 필수 정보를 전달하지 않는다.
 - `feature-team`의 상세 산출물은 유지한다. `HANDOFF.md`에는 해당 파일 경로와 다음 모델이 알아야 할 핵심 결론만 적는다.
 - 절차는 `docs/agent-contracts/handoff.md`, 경로·필수 항목·보관 규칙은 `artifacts/work/README.md`를 따른다.

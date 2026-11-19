@@ -161,6 +161,19 @@ test('역할 명세에 필수 절·팀 통신 항목과 도구별 메타데이�
 	}
 });
 
+test('Antigravity 역할 카드가 Claude·Codex 역할 집합 및 effort와 일치함', () => {
+	assert.deepEqual(names('.agents/agents', '.json'), names('.codex/agents', '.toml'));
+	for (const role of names('.agents/agents', '.json')) {
+		const card = JSON.parse(read(`.agents/agents/${role}.json`));
+		const toml = read(`.codex/agents/${role}.toml`);
+		const effort = toml.match(/^model_reasoning_effort = "([^"\n]+)"$/m)[1];
+		assert.equal(card.role, role, role);
+		assert.equal(card.runtime, 'antigravity-swarm', role);
+		assert.match(card.model, new RegExp(`-${effort}$`), `${role}: ${card.model} vs ${effort}`);
+		assert.ok(existsSync(join(H, card.instructions_ref)), `${role}: ${card.instructions_ref}`);
+	}
+});
+
 test('양쪽 스킬 명세에 해당 작성 형식의 필수 절이 있음', () => {
 	for (const skill of readdirSync(join(H, '.claude/skills'))) {
 		const headings =
