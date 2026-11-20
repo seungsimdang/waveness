@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-11-20 chore(harness): harness_edit_approval.py 양방향 동기화 편입 및 LLM 판정기 통일
+
+> - `.harness/upstream-paths` 및 `bin/harness.test.mjs`에 `.harness/harness_edit_approval.py`를 추가해 `seungness`와 양방향 동기화하도록 전환
+> - `seungness`의 `codex exec` 기반 의미 판정기·`plan_file` 해시 검증과 최신 훅·회귀 테스트를 동기화 반영
+
 ## 2026-11-19 feat(harness): Antigravity 역할 카드 네이티브 Markdown 전환, swarm 검증 훅 추가 및 effort medium 통일
 
 > - `.agents/agents/*.json`을 Antigravity 네이티브 `.agents/agents/{role}.md`(`model: inherit`, `swarm_model: gemini-4-hydrogen-medium`, `subagent: true`, `tools:`, `integration-reviewer` `inheritMcp: true`, Claude·Codex 동일 본문)로 전환

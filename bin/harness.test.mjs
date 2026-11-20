@@ -555,6 +555,7 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
     for (const file of [
       "spec.test.mjs",
       "runtime-hooks.test.mjs",
+      "harness_edit_approval.py",
       "deferred-claims-pattern.txt",
       "deferred-claims-exempt-pattern.txt",
       "git-guards.test.mjs",
