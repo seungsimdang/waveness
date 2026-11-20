@@ -42,7 +42,7 @@ def main():
             return
         if event == 'UserPromptSubmit':
             prompt = data.get('prompt', '')
-            # 작업자 보고·자동 계속 프롬프트는 사용자 새 지시로 취급하지 않는다.
+            # 작업자 보고·자동 계속 프롬프트는 사용자 새 지시로 취급하지 않음
             if prompt.strip() and not re.match(r'\s*(?:<agent-message(?:\s|>)|Message Type: (?:MESSAGE|FINAL_ANSWER)|Another .* session sent a message|<hook_prompt\b)', prompt):
                 state['suspended'] = True
         elif event == 'SubagentStart':

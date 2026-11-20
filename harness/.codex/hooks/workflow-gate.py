@@ -299,7 +299,7 @@ def hook(data):
             generation = start_check(state, kinds)
             pending = state.setdefault('pending', {})
             pending[call_id] = (snapshot, sorted(kinds), generation)
-            # 완료 이벤트 없이 끊긴 도구 호출에서 상태가 무한히 커지는 것을 방지한다.
+            # 완료 이벤트 없이 끊긴 도구 호출에서 상태가 무한히 커지는 것을 방지
             if len(pending) > 64:
                 pending.pop(next(iter(pending)))
         evidence = {'checks': state['checks']}

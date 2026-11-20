@@ -66,7 +66,8 @@ for sentence in re.split(r"(?<=[.!?])\s+|\n|[,;]\s+|\s+(?:다만|하지만|그�
 
 MAX_TURN_TEXT_CHARS = 6000
 
-# 질문 창 직전 등 마지막 응답 이전에 쓴 설명도 원인 판정에 쓰도록, transcript에서 이번 턴 assistant 텍스트를 모음(형식은 require-korean-response.sh와 같은 해석). 못 읽으면 마지막 응답만으로 판정
+# 질문 창 직전 등 마지막 응답 이전에 쓴 설명도 원인 판정에 쓰도록 transcript에서 이번 턴 assistant 텍스트를 모음(형식은 require-korean-response.sh와 같은 해석)
+# 못 읽으면 마지막 응답만으로 판정
 turn_texts = []
 try:
     with open(data.get("transcript_path") or "", encoding="utf-8") as transcript:

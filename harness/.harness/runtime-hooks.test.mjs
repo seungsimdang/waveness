@@ -1333,6 +1333,19 @@ for (const tool of ['.claude', '.codex']) {
 	});
 }
 
+
+test('코덱스 실행 예고 훅은 마지막 문단의 이어가기 약속만 차단한다', () => {
+ const decide = (message, extra = {}) => {
+  const result = run('.codex', 'require-execution-for-declared-step', { last_assistant_message: message, ...extra });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim() ? JSON.parse(result.stdout).decision : 'allow';
+ };
+ for (const message of ['진단을 이어가겠습니다.', '이어서 가겠습니다.', '진단을 이어갑니다.', '계속하겠습니다.', '재개하겠습니다.', 'gh로 확인 가능한 진단을 이어가겠습니다. 현재 원인은 확정하지 못했습니다.']) assert.equal(decide(message), 'block');
+ for (const message of ['보고가 오면 이어가겠습니다.', '확인이 끝나면 계속하겠습니다.', '진단을 이어갔습니다.', '> 진단을 이어가겠습니다.\n\n인용입니다.', '`이어가겠습니다`를 탐지합니다.', '진단을 이어가겠습니다.\n\n검토 결과 이 계획은 취소했습니다.']) assert.equal(decide(message), 'allow');
+ assert.equal(decide('이어가겠습니다.', { stop_hook_active: true }), 'allow');
+ assert.equal(decide('이어가겠습니다.', { agent_id: 'worker' }), 'allow');
+});
+
 const withTmp = (prefix, body) => {
 	const tmp = mkdtempSync(join(tmpdir(), prefix));
 
@@ -1793,13 +1806,34 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
  const plan = {id: 'test-plan', skill: 'harness-lab', root: project, changes: [{before_sha256: {[file]: 'absent'}, edit_sha256: hash(data)}]};
  const message = (role, text, codex = false) => codex ? {type: 'response_item', payload: {role, content: [{type: role === 'user' ? 'input_text' : 'output_text', text}]}} : {type: role, message: {content: text}};
  const blueprint = (value = plan, codex = false) => message('assistant', `<harness-plan>${JSON.stringify(value)}</harness-plan>`, codex);
+ const judgeBin = join(project, 'bin');
+ mkdirSync(judgeBin);
+ writeFileSync(join(judgeBin, 'codex'), `#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+request = json.load(sys.stdin)
+text = request["user_reply"]
+if text in ["승인", "ㅇㅇ 적용해", "ㅇㅇ 그렇게 해", "- test-plan 승인"]:
+    decision = "approve"
+elif text == "승인 취소":
+    decision = "revoke"
+elif text.endswith("?"):
+    decision = "question"
+else:
+    decision = "unclear"
+Path(sys.argv[sys.argv.index("-o") + 1]).write_text(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
+`);
+ chmodSync(join(judgeBin, 'codex'), 0o755);
  const call = (entries, input = data) => {
   const transcript = join(project, 'transcript.jsonl');
   writeFileSync(transcript, entries.map(value => JSON.stringify(value)).join('\n'));
-  return spawnSync('sh', [join(H, '.claude/hooks/require-harness-lab-before-harness-edit.sh')], {input: JSON.stringify({...input, cwd: project, transcript_path: transcript}), encoding: 'utf8', env: {...env, CLAUDE_PROJECT_DIR: project}});
+  return spawnSync('sh', [join(H, '.claude/hooks/require-harness-lab-before-harness-edit.sh')], {input: JSON.stringify({...input, cwd: project, transcript_path: transcript}), encoding: 'utf8', env: {...env, CLAUDE_PROJECT_DIR: project, PATH: `${judgeBin}:${env.PATH}`}});
  };
  const approved = [blueprint(), message('user', '승인')];
  assert.equal(call(approved).status, 0);
+ assert.equal(call([blueprint(), message('user', 'ㅇㅇ 그렇게 해')]).status, 0);
+ assert.equal(call([blueprint(), message('user', '- test-plan 승인')]).status, 0);
+ assert.equal(call([blueprint(), message('user', '승인해도 돼?')]).status, 2);
  assert.equal(call([blueprint(plan, true), message('user', 'ㅇㅇ 적용해', true)]).status, 0);
  assert.equal(call([blueprint(), message('user', '<send_user_message_question_reply>[{"answer":"승인"}]</send_user_message_question_reply>')]).status, 0);
  assert.equal(call([blueprint()]).status, 2);
@@ -1808,7 +1842,7 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
  assert.equal(call(approved, {...data, tool_input: {...data.tool_input, file_path: join(project, '.codex/new.sh')}}).status, 2);
  assert.equal(call([blueprint(), message('user', '<hook_prompt>승인</hook_prompt>')]).status, 2);
  assert.equal(call([...approved, message('user', '승인 취소')]).status, 2);
- assert.equal(call([...approved, blueprint()]).status, 2);
+ assert.equal(call([...approved, blueprint()]).status, 0);
  assert.equal(call([message('user', `${file} 수정해`)]).status, 2);
  const patch = {...data, tool_name: 'apply_patch', tool_input: {command: '*** Begin Patch\n*** Add File: .codex/new.sh\n+new\n*** End Patch'}};
  const patchPlan = {...plan, changes: [{before_sha256: {[join(project, '.codex/new.sh')]: 'absent'}, edit_sha256: hash(patch)}]};
@@ -1824,7 +1858,7 @@ for (const tool of ['.claude', '.codex']) test(`${tool} 질문 창의 질문 본
  const prompt = `<send_user_message_question_reply>${JSON.stringify([{answer: '위 diff 적용', question: '청사진을 검토하고 적용할까요?'}])}</send_user_message_question_reply>`;
  const extract = prompt => spawnSync('sh', [join(H, tool, 'hooks/user-prompt-text.sh')], {input: JSON.stringify({prompt}), encoding: 'utf8'});
  assert.equal(extract(prompt).stdout.trim(), '위 diff 적용');
- const embedded = '<send_user_message_question_reply>' + JSON.stringify([{answer: '태그 </send_user_message_question_reply> 뒤도 보존'}]) + '</send_user_message_question_reply>';
+ const embedded = `<send_user_message_question_reply>${JSON.stringify([{answer: '태그 </send_user_message_question_reply> 뒤도 보존'}])}</send_user_message_question_reply>`;
  assert.equal(extract(embedded).stdout.trim(), '태그 </send_user_message_question_reply> 뒤도 보존');
  const session_id = `question-answer-${tool}`;
  const submit = value => run(tool, 'confirm-edit-on-report-request', {hook_event_name: 'UserPromptSubmit', session_id, prompt: value});

@@ -84,7 +84,7 @@ if event != "Stop":
         print("가능 여부 키워드 감지: 사용자가 가능한지 묻는 질문이면 이번 턴 첫 응답을 가능합니다. 또는 불가능합니다.로 시작할 것. 도구 확인보다 판정을 먼저 쓰고, 일부만 가능하다는 분할 판정, 진행 안내 문장, 얼버무림, 비교표로 시작 금지. 단서와 범위는 둘째 문장부터. 키워드를 언급만 한 메시지(작업 지시 등)면 해당 없음.")
     elif confirmation:
         print("확인 질문이면 이번 턴 첫 응답을 네. 또는 아니요.(마침표 포함)로 시작하고 근거·진행 상황은 뒤에 설명하세요. 도구 확인보다 판정을 먼저 쓰고, 판단 근거가 없으면 확인할 수 없습니다.로 답하세요.")
-    # 새 사용자 턴의 표시만 사용한다. turn_id가 없는 Claude는 새 실제 프롬프트에서 갱신한다.
+    # 새 사용자 턴의 표시만 사용하며 turn_id가 없는 Claude는 새 실제 프롬프트에서 갱신
     if not turn or not current_request():
         clear_mark()
     if feasibility or confirmation:
@@ -202,7 +202,7 @@ if confirmation:
 """
 if verdict:
     judge_body = body[:3000]
-    # 긴 답변에서도 서로 다른 검사 후보의 문맥을 함께 보낸다.
+    # 긴 답변에서도 서로 다른 검사 후보의 문맥을 함께 전달
     for start, end in spans:
         if end > 3000:
             judge_body += "\n\n[검사 후보 주변 문맥]\n" + body[max(0, start - 300):end + 300]
