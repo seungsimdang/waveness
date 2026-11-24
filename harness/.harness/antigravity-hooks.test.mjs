@@ -259,13 +259,12 @@ test('Antigravity PreToolUse edit_file에서 승인된 harness-plan 청사진이
 
 		writeFileSync(targetFile, 'old\n');
 
-		const codexMock = join(project, 'bin/codex');
+		const claudeMock = join(project, 'bin/claude');
 
 		writeFileSync(
-			codexMock,
+			claudeMock,
 			`#!/usr/bin/env python3
 import json, sys
-from pathlib import Path
 request = json.load(sys.stdin)
 text = request["user_reply"].strip()
 if text == "승인":
@@ -274,10 +273,16 @@ elif text == "승인 취소":
     decision = "revoke"
 else:
     decision = "unclear"
-Path(sys.argv[sys.argv.index("-o") + 1]).write_text(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
+print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 `
 		);
-		chmodSync(codexMock, 0o755);
+		chmodSync(claudeMock, 0o755);
+		for (const fallback of ['codex', 'agy']) {
+			const stub = join(project, 'bin', fallback);
+
+			writeFileSync(stub, '#!/bin/sh\nexit 1\n');
+			chmodSync(stub, 0o755);
+		}
 
 		const beforeSha = createHash('sha256').update('old\n').digest('hex');
 		const editPayload = {

@@ -1894,10 +1894,17 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
  const blueprint = (value = plan, codex = false) => message('assistant', `<harness-plan>${JSON.stringify(value)}</harness-plan>`, codex);
  const judgeBin = join(project, 'bin');
  mkdirSync(judgeBin);
- writeFileSync(join(judgeBin, 'codex'), `#!/usr/bin/env python3
+ const setStub = (name, content) => {
+  writeFileSync(join(judgeBin, name), content);
+  chmodSync(join(judgeBin, name), 0o755);
+ };
+ const judgeScript = mode => `#!/usr/bin/env python3
 import json, sys
 from pathlib import Path
-request = json.load(sys.stdin)
+if "${mode}" == "agy":
+    request = json.loads(sys.argv[sys.argv.index("-p") + 1])
+else:
+    request = json.load(sys.stdin)
 text = request["user_reply"]
 if text in ["승인", "ㅇㅇ 적용해", "ㅇㅇ 그렇게 해", "- test-plan 승인"]:
     decision = "approve"
@@ -1907,9 +1914,15 @@ elif text.endswith("?"):
     decision = "question"
 else:
     decision = "unclear"
-Path(sys.argv[sys.argv.index("-o") + 1]).write_text(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
-`);
- chmodSync(join(judgeBin, 'codex'), 0o755);
+out = json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False)
+if "${mode}" == "codex":
+    Path(sys.argv[sys.argv.index("-o") + 1]).write_text(out)
+else:
+    print(out)
+`;
+ setStub('claude', judgeScript('claude'));
+ setStub('codex', '#!/bin/sh\nexit 1\n');
+ setStub('agy', '#!/bin/sh\nexit 1\n');
  const call = (entries, input = data) => {
   const transcript = join(project, 'transcript.jsonl');
   writeFileSync(transcript, entries.map(value => JSON.stringify(value)).join('\n'));
@@ -1934,6 +1947,36 @@ Path(sys.argv[sys.argv.index("-o") + 1]).write_text(json.dumps({"decision": deci
  const patchPlan = {...plan, changes: [{before_sha256: {[join(project, '.codex/new.sh')]: 'absent'}, edit_sha256: hash(patch)}]};
  assert.equal(call([blueprint(patchPlan, true), message('user', '승인', true)], patch).status, 0);
  assert.equal(call([], patch).status, 2);
+ // 과거 청사진 뒤 사용자 메시지는 판정기를 호출하지 않고 최종 청사진 이후만 판정
+ const oldPlan = {...plan, id: 'old-plan'};
+ const callLog = join(project, 'judge-calls.log');
+ setStub('claude', `#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+with Path(${JSON.stringify(callLog)}).open("a", encoding="utf-8") as log:
+    log.write("call\\n")
+request = json.load(sys.stdin)
+text = request["user_reply"]
+decision = "approve" if text == "승인" else "unclear"
+print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
+`);
+ assert.equal(call([blueprint(oldPlan), message('user', '이전 질문 1'), message('user', '이전 질문 2'), blueprint(), message('user', '승인')]).status, 0);
+ assert.equal(readFileSync(callLog, 'utf8').trim().split('\n').length, 1);
+ // 1순위 claude 실패 -> 2순위 codex 폴백
+ setStub('claude', '#!/bin/sh\nexit 1\n');
+ setStub('codex', judgeScript('codex'));
+ assert.equal(call(approved).status, 0);
+ assert.equal(call([...approved, message('user', '승인 취소')]).status, 2);
+ // claude·codex 모두 실패 -> 3순위 agy 폴백
+ setStub('codex', '#!/bin/sh\nexit 1\n');
+ setStub('agy', judgeScript('agy'));
+ assert.equal(call(approved).status, 0);
+ assert.equal(call([...approved, message('user', '승인 취소')]).status, 2);
+ // 모든 판정기 실패 -> 차단
+ setStub('agy', '#!/bin/sh\nexit 1\n');
+ assert.equal(call(approved).status, 2);
+ // 이후 테스트를 위해 claude 복구
+ setStub('claude', judgeScript('claude'));
  mkdirSync(join(project, '.claude/hooks'), {recursive: true});
  writeFileSync(file, 'changed');
  assert.equal(call(approved).status, 2);
