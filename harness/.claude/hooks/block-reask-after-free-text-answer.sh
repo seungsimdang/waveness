@@ -9,6 +9,7 @@
 # subagent 호출은 사용자 답변과 무관한 작업이라 제외
 # 트랜스크립트 형식이 바뀌거나 읽을 수 없으면 차단하지 않음
 # stop 인자 모드(Stop 훅): 같은 판정으로 차단이 풀려 있는데 마지막 응답이 "다음 메시지 후 질문 창으로 묻겠다"처럼 질문을 미루면 1회 차단
+# stop 인자 모드에서도 이번 턴 사용자 메시지가 질문·답변 요구면 미루기 허용
 
 mode=${1:-pretool}
 input=$(cat)
@@ -53,6 +54,36 @@ except Exception:
     sys.exit(0)
 
 if data.get("stop_hook_active") or data.get("agent_id"):
+    sys.exit(0)
+
+# 이번 턴 사용자 메시지가 질문이나 답변 요구면 답한 턴을 텍스트로 끝내고 질문 창은 다음 턴으로 미루는 것이 맞아 차단하지 않음
+# 같은 응답에서 질문 창을 띄우면 답 텍스트가 가려짐
+ASK = re.compile(
+    r"[?？]|(까요?|나요|가요|니|냐|는지|은지|인지|던가|임|함)[\s.!~]*$|왜|뭐|뭔|무슨|무엇|어떻게|어디|언제|누가|누구|어느|몇"
+    r"|(답변|대답|답|설명)\s*(해|하라|해\s*줘|해\s*봐|부터)|알려\s*줘",
+    re.M,
+)
+last_prompt = ""
+try:
+    with open(data.get("transcript_path") or "", encoding="utf-8") as lines:
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except Exception:
+                continue
+            if entry.get("type") != "user" or entry.get("isMeta"):
+                continue
+            content = (entry.get("message") or {}).get("content")
+            if isinstance(content, list):
+                if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in content):
+                    continue
+                content = "\n".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+            if isinstance(content, str) and content.strip():
+                last_prompt = content
+except Exception:
+    pass
+last_prompt = re.sub(r"<(pasted_content|agent-message|task-notification)\b.*?(</\1[^>]*>|\Z)", "", last_prompt, flags=re.S)
+if ASK.search(last_prompt):
     sys.exit(0)
 
 # 코드 블록, 인라인 코드, 인용문은 사용자 문장 인용일 수 있어 제외

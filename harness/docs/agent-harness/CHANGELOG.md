@@ -1,5 +1,15 @@
 # 하네스 변경 이력
 
+## 2026-11-24 fix(harness): 답변 요구 턴 질문 창 차단 및 한화 공용 동기화 충돌 해결
+
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@751788f0b190b04ef275fdebaf96488079da64d1`
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@a23c6864338034769d4829548102d4af72f870e0`
+- Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@f49b751e4773b35024d908896359d584e0260554`
+
+> - `require-answer-before-edit.sh`를 `AskUserQuestion` PreToolUse에도 연결하고 답변 요구 지시("확인하고 다시 답변해", "설명해")를 판정 대상으로 포함
+> - `~하고 보고해` 같은 작업 뒤 결과 보고 지시는 미답변 질문 판정 및 `block-reask-after-free-text-answer.sh` 예외에서 제외
+> - 회귀 테스트 갱신 및 이미 반영된 `751788f` 이력 정리
+
 ## 2026-11-24 fix(harness): 작업 중 보낸 확인 질문의 판정 훅 오탐 수정
 
 - Harness-Origin: `kcl-monitoring-frontend@42f0db569e023d169922382586ff18e35d8918b0`

@@ -1,5 +1,6 @@
 #!/bin/sh
-# PreToolUse(Edit|Write|NotebookEdit, 파일 쓰는 Bash)·Stop 훅(차단): 사용자 질문에 답하지 않은 채 파일을 고치거나 턴을 끝내는 것을 막음
+# PreToolUse(Edit|Write|NotebookEdit, 파일 쓰는 Bash, AskUserQuestion)·Stop 훅(차단): 사용자 질문에 답하지 않은 채 파일을 고치거나 질문 창을 띄우거나 턴을 끝내는 것을 막음
+# "확인하고 다시 답변해"처럼 앞서 한 답을 다시 요구하는 지시도 답해야 할 질문으로 보고, "~하고 보고해"처럼 작업 뒤 결과 보고를 요구하는 지시는 질문으로 보지 않음
 # 질문 응답 여부 판정은 이 훅만 맡음. judge-unverified-claims.sh는 답의 내용(근거, 원인)만 판정함
 # Stop은 사용자 중단 시 실행되지 않아(Claude Code hooks 문서 Stop 절) 턴 끝 판정만으로는 부족함
 # 질문은 transcript의 이번 턴 사용자 메시지(턴 시작, 작업 중 메시지, 질문 창 직접 입력)에서 모으고, 의문형 후보가 없으면 판정기를 부르지 않음
@@ -34,7 +35,11 @@ MAX_TURN_TEXT_CHARS = 6000
 TURN_TEXT_HEAD_CHARS = 3000
 
 # 후보만 넓게 고르고 실제 질문 여부는 판정기가 정함
-QUESTION = re.compile(r"\?|왜|뭐|무엇|어떻게|어캐|어디|언제|누가|얼마|(냐|니|나요|까요|건가|인가|던가|임|함)[\s.!~]*$", re.M)
+QUESTION = re.compile(
+    r"\?|왜|뭐|무엇|어떻게|어캐|어디|언제|누가|얼마|(냐|니|나요|까요|건가|인가|던가|임|함)[\s.!~]*$"
+    r"|(답변|대답|답|설명)\s*(해|하라|해\s*줘|해\s*봐|부터)|알려\s*줘",
+    re.M,
+)
 BASH_WRITE = re.compile(
     r"\bsed\s+(-\w+\s+)*-i|\btee\b|(^|[\s;&|(])(cp|mv|rm|mkdir|touch)\s"
     r"|open\([^)]*[\"\x27][wa]|\.(write|write_text|write_bytes)\s*\(|writeFileSync|\bgit\s+(commit|apply|checkout|restore|reset|stash|add|rm|mv)\b"
@@ -156,9 +161,11 @@ if len(turn_text) > MAX_TURN_TEXT_CHARS:
     # 앞부분 답과 최근 답이 모두 판정기에 보이도록 앞과 끝을 이어 붙임
     turn_text = turn_text[:TURN_TEXT_HEAD_CHARS] + "\n…\n" + turn_text[-(MAX_TURN_TEXT_CHARS - TURN_TEXT_HEAD_CHARS):]
 turn_text = turn_text or "(없음)"
-moment = "파일을 고치려는 지금까지" if event == "PreToolUse" else "턴을 끝내는 지금까지"
+asking = data.get("tool_name") == "AskUserQuestion"
+action = "질문 창을 띄우" if asking else "파일을 고치"
+moment = f"{action}려는 지금까지" if event == "PreToolUse" else "턴을 끝내는 지금까지"
 judge_prompt = f"""[사용자 메시지](턴 시작 메시지, 작업 중에 보낸 메시지, 질문 창 직접 입력, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [이번 턴 응답 텍스트] 어디에서도 답하지 않은 것이 있는지 판정하고 JSON 한 줄만 출력한다.
-기준 시점은 {moment}다. 작업 지시는 질문이 아니다. 이전 답변을 인용만 한 문장, 결정 선택지에 대한 답, 질문 없이 내용만 전달한 메시지도 질문이 아니다. 답의 정확성은 판정하지 않는다. 확신이 없으면 통과시킨다.
+기준 시점은 {moment}다. 작업 지시는 질문이 아니다. 단 "확인하고 다시 답변해", "다시 대답해"처럼 앞서 한 답을 다시 요구하는 지시는 답해야 할 질문으로 보고, 원문을 그대로 unanswered에 쓴다. "~하고 보고해", "검토 후 보고해"처럼 작업을 먼저 하고 끝에 결과를 보고하라는 지시는 질문이 아니다. 이전 답변을 인용만 한 문장, 결정 선택지에 대한 답, 질문 없이 내용만 전달한 메시지도 질문이 아니다. 답의 정확성은 판정하지 않는다. 확신이 없으면 통과시킨다.
 출력: {{"unanswered": "<답하지 않은 질문 원문>"}} 또는 모두 답했거나 질문이 없으면 {{"unanswered": null}}.
 
 [사용자 메시지]
@@ -225,7 +232,9 @@ if event == "PreToolUse":
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
         "permissionDecisionReason": "답하지 않은 사용자 질문이 있습니다: " + question
-        + " 파일을 고치기 전에 이 질문의 답을 응답 텍스트로 먼저 쓰세요. 답을 쓴 뒤 같은 수정을 다시 시도하면 통과합니다. 답에 필요한 자료 읽기는 막지 않습니다.",
+        + f" {action}기 전에 이 질문의 답을 응답 텍스트로 먼저 쓰세요. "
+        + ("질문 창은 답을 본 사용자의 다음 메시지 이후에 띄우세요." if asking else "답을 쓴 뒤 같은 수정을 다시 시도하면 통과합니다.")
+        + " 답에 필요한 자료 읽기는 막지 않습니다.",
     }}, ensure_ascii=False))
 else:
     # stop_hook_active가 계속 false로 들어온 보고(anthropics/claude-code#54360)가 있어 같은 질문 묶음은 Stop에서 한 번만 막음
