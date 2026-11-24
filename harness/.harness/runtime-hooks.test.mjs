@@ -152,10 +152,15 @@ for (const tool of ['.claude', '.codex']) {
 		assert.equal(lint('git commit -m "a"'), 0);
 		writeFileSync(join(repo, 'b.ts'), 'WARN\n');
 		assert.equal(lint('git add . && git commit -m "a"'), 2);
+		assert.equal(lint('git commit -am "a"'), 2);
+		assert.equal(lint('git commit -m "a"'), 0);
 		assert.equal(lint('git status'), 0);
 		assert.equal(lint('echo "git commit"'), 0);
+		git('add', 'b.ts');
+		assert.equal(lint('git commit -m "a"'), 2);
 		assert.equal(lint(`cd ${repo} && git commit -m "a"`, marks), 2);
 		assert.equal(lint(`git -C ${repo} commit -m "a"`, marks), 2);
+		assert.equal(lint('git commit --amend -m "a"'), 2);
 		writeFileSync(join(repo, 'b.ts'), 'ok\n');
 		mkdirSync(join(repo, '.harness'));
 		writeFileSync(

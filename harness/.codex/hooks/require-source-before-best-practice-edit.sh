@@ -4,7 +4,7 @@
 # 질문 응답 여부는 require-answer-before-edit.sh, 응답의 근거는 judge-unverified-claims.sh, 답 형식 안내는 require-single-best-practice.sh가 맡음
 # 조회 여부는 판단이 필요 없는 사실이라 판정기 없이 규칙으로만 판정함
 # 결론을 먼저 공유했는지와 출처가 결론을 뒷받침하는지는 판정 범위 밖임
-# Claude transcript와 Codex JSONL을 모두 읽고, 입력이나 transcript를 해석할 수 없으면 통과
+# Claude transcript, Codex JSONL, Antigravity transcript를 모두 읽고, 입력이나 transcript를 해석할 수 없으면 통과
 
 input=$(cat)
 
@@ -14,7 +14,7 @@ import json, re, sys
 KEYWORD = re.compile(r"best[ _-]?practice|베스트[ ]?프랙티스", re.I)
 DELEGATE = re.compile(r"판단|처리|적용|알아서")
 LOOKUP = re.compile(
-    r"^(WebSearch|WebFetch|web_search)$|^mcp__context7__|^mcp__.*(search_docs|get_doc|query-docs|search_vercel_documentation)$"
+    r"^(WebSearch|WebFetch|web_search|search_web)$|^mcp__context7__|^mcp__.*(search_docs|get_doc|query-docs|search_vercel_documentation)$"
 )
 BASH_WRITE = re.compile(
     r"\bsed\s+(-\w+\s+)*-i|\btee\b|(^|[\s;&|(])(cp|mv|rm|mkdir|touch)\s"
@@ -56,6 +56,17 @@ def texts(content, kinds):
 events = []
 for entry in entries:
     if not isinstance(entry, dict):
+        continue
+    if entry.get("type") == "USER_INPUT":
+        # Antigravity transcript는 사용자 원문을 USER_REQUEST 태그로 감쌈
+        text = str(entry.get("content") or "")
+        request = re.search(r"<USER_REQUEST>(.*?)</USER_REQUEST>", text, re.S)
+        events.append(("turn", request.group(1) if request else text, False))
+        continue
+    if entry.get("type") == "PLANNER_RESPONSE":
+        for c in entry.get("tool_calls") or []:
+            if isinstance(c, dict):
+                events.append(("tool", None, bool(LOOKUP.search(str(c.get("name") or "")))))
         continue
     payload = entry.get("payload") or {}
     if payload:

@@ -360,3 +360,43 @@ print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 		rmSync(project, { recursive: true, force: true });
 	}
 });
+
+test('Antigravity best practice 판단 위임 턴은 search_web 전에 편집과 쓰기 명령을 차단함', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'agy-source-'));
+
+	try {
+		const transcript = join(dir, 'transcript.jsonl');
+		const request = { type: 'USER_INPUT', content: '<USER_REQUEST>\nbest practice 판단하여 처리해\n</USER_REQUEST>' };
+		const edit = () =>
+			runAdapter('pre-tool-edit', 'require-source-before-best-practice-edit', {
+				toolCall: { name: 'edit_file', args: { Path: join(dir, 'a.ts'), Target: 'a', Replacement: 'b' } },
+				transcriptPath: transcript,
+				cwd: H
+			});
+		const bash = CommandLine =>
+			runAdapter('pre-tool-bash', 'require-source-before-best-practice-edit', {
+				toolCall: { name: 'run_command', args: { CommandLine } },
+				transcriptPath: transcript,
+				cwd: H
+			});
+
+		writeFileSync(transcript, `${JSON.stringify(request)}\n`);
+		assert.equal(edit().decision, 'deny');
+		assert.equal(bash('echo x > a.md').decision, 'deny');
+		assert.equal(bash('git status --short').decision, 'allow');
+
+		writeFileSync(
+			transcript,
+			`${JSON.stringify(request)}\n${JSON.stringify({ type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'read_file', args: {} }] })}\n`
+		);
+		assert.equal(edit().decision, 'deny');
+
+		writeFileSync(
+			transcript,
+			`${JSON.stringify(request)}\n${JSON.stringify({ type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'search_web', args: {} }] })}\n`
+		);
+		assert.equal(edit().decision, 'allow');
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

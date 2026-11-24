@@ -48,12 +48,17 @@ else
   exit 0
 fi
 
-# 같은 명령의 git add·commit -a로 커밋될 파일까지 잡으려고 HEAD 대비 변경 파일과 추적하지 않는 파일을 모두 검사
-# ponytail: 이번 커밋에 넣지 않는 작업 트리 변경도 작업 트리 내용 기준으로 검사함
-files=$({
-  git diff --name-only --diff-filter=ACMR HEAD 2>/dev/null || git diff --cached --name-only --diff-filter=ACMR
-  git ls-files --others --exclude-standard
-} | grep -E "$pattern" | sort -u)
+# 같은 명령에 git add나 commit -a가 있으면 훅 시점에 커밋될 파일이 정해지지 않아 HEAD 대비 변경 파일과 추적하지 않는 파일을 모두 검사
+# 그 외에는 이번 커밋에 들어갈 스테이징한 파일만 검사
+# ponytail: 파일 내용은 스테이징본이 아니라 작업 트리 기준으로 검사함
+if printf '%s\n' "$shell" | grep -qE 'git([ 	]+-C[ 	]+[^ 	;&|]+)?[ 	]+add\b|git([ 	]+-C[ 	]+[^ 	;&|]+)?[ 	]+commit\b[^;&|]*[ 	](-[A-Za-z]*a[A-Za-z]*|--all)\b'; then
+  files=$({
+    git diff --name-only --diff-filter=ACMR HEAD 2>/dev/null || git diff --cached --name-only --diff-filter=ACMR
+    git ls-files --others --exclude-standard
+  } | grep -E "$pattern" | sort -u)
+else
+  files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E "$pattern" | sort -u)
+fi
 [ -n "$files" ] || exit 0
 
 if ! out=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 "$@" 2>&1); then
