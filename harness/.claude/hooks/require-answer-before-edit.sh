@@ -12,23 +12,18 @@
 # 같은 질문 묶음이 한 번 통과하면 같은 턴의 이후 수정·Stop은 다시 판정하지 않음
 # Bash는 쓰기 명령 패턴(sed -i, 파일 리다이렉트, tee, cp·mv·rm, 스크립트 안 파일 쓰기, git 변경 명령)에 걸릴 때만 판정하고 읽기 명령은 통과
 # 인용된 문자열을 제외하고 출력 리다이렉트를 확인함
-# 판정은 Claude가 haiku, Codex가 gpt-6-luna(effort medium)를 쓰고, 판정 실패·타임아웃·transcript 해석 불가는 통과
+# 판정기는 런타임별(Claude haiku, Codex gpt-6-luna, Antigravity gemini-4-hydrogen-medium, effort 모두 medium)이고, 판정 실패·타임아웃·transcript 해석 불가는 통과
 # 이번 턴 응답 텍스트가 없더라도 질문 후보가 있으면 수정 전에 응답 여부 판정
-# 도구 호출 직전에 쓴 응답 텍스트가 transcript에 빠지는 경우가 있어 PreToolUse는 같은 질문 묶음을 1회만 막고 재시도는 통과
+# 도구 호출 직전에 쓴 응답 텍스트가 transcript에 빠지는 경우가 있어 PreToolUse는 같은 질문을 1회만 막고 재시도는 통과
 # 턴 끝 답변 여부는 last_assistant_message를 쓰는 Stop 판정이 맡음
-# Claude와 Codex가 같은 본문을 쓰고, 판정 CLI는 스크립트 위치로 고름
-# Codex transcript는 require-korean-response.sh와 같은 형식으로 해석함
+# Claude와 Codex가 같은 본문을 쓰고, 판정 CLI는 .harness/judge_command.py가 HARNESS_RUNTIME과 스크립트 위치로 고름
+# Codex transcript는 require-korean-response.sh와 같은 형식으로, Antigravity transcript는 USER_INPUT·PLANNER_RESPONSE 항목으로 해석함
 
 [ -n "${HARNESS_STOP_JUDGE:-}" ] && exit 0
 
-case "$0" in
-  *.codex/*) judge_tool=codex ;;
-  *) judge_tool=claude ;;
-esac
-
 input=$(cat)
 
-printf '%s' "$input" | JUDGE_TOOL="$judge_tool" MARK_DIR="${TMPDIR:-/tmp}/answer-before-edit" python3 -c '
+printf '%s' "$input" | HOOK_SCRIPT="$0" MARK_DIR="${TMPDIR:-/tmp}/answer-before-edit" python3 -c '
 import hashlib, json, os, re, subprocess, sys, tempfile
 
 JUDGE_TIMEOUT_SECONDS = 40
@@ -47,7 +42,7 @@ BASH_WRITE = re.compile(
     r"|open\([^)]*[\"\x27][wa]|\.(write|write_text|write_bytes)\s*\(|writeFileSync|\bgit\s+(commit|apply|checkout|restore|reset|stash|add|rm|mv)\b"
 )
 
-REDIRECT = re.compile(r"[\x27][^\x27]*[\x27]|\"(?:\\.|[^\"\\])*\"|\\.|(?P<output>(?<![<>])>>?\s*(?![>&\s]|/dev/null(?:\s|$))\S)")
+REDIRECT = re.compile(r"[\x27][^\x27]*[\x27]|\"(?:\\.|[^\"\\])*\"|\\.|(?P<output>(?<![<>])>>?\s*(?![>&\s]|/dev/null(?:[\s;&|)]|$))\S)")
 
 try:
     data = json.load(sys.stdin)
@@ -68,6 +63,9 @@ else:
     sys.exit(0)
 
 def is_user_prompt(entry):
+    # Antigravity transcript는 사용자 메시지를 USER_INPUT 문자열로 남김
+    if entry.get("type") == "USER_INPUT":
+        return isinstance(entry.get("content"), str)
     if entry.get("type") != "user" or entry.get("isMeta"):
         return False
     content = (entry.get("message") or {}).get("content")
@@ -102,7 +100,14 @@ if start is None:
     sys.exit(0)
 
 turn_id = str(entries[start].get("uuid") or start)
-prompts = [user_text(text_of(entries[start]["message"].get("content")))]
+def prompt_of(entry):
+    if entry.get("type") == "USER_INPUT":
+        # 요청 본문만 쓰고 메타데이터 블록은 제외
+        match = re.search(r"<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>", entry["content"], re.S)
+        return match.group(1) if match else entry["content"]
+    return text_of(entry["message"].get("content"))
+
+prompts = [user_text(prompt_of(entries[start]))]
 turn_texts = []
 for entry in entries[start + 1:]:
     if not isinstance(entry, dict):
@@ -111,6 +116,8 @@ for entry in entries[start + 1:]:
     attachment = entry.get("attachment") or {}
     if attachment.get("type") == "queued_command" and attachment.get("prompt"):
         prompts.append(user_text(str(attachment["prompt"])))
+    if entry.get("type") == "PLANNER_RESPONSE" and isinstance(entry.get("content"), str):
+        turn_texts.append(entry["content"])
     if entry.get("type") == "assistant":
         for c in (entry.get("message") or {}).get("content") or []:
             if isinstance(c, dict) and c.get("type") == "text":
@@ -139,15 +146,20 @@ except OSError:
     pass
 
 # PreToolUse 1회 차단 표시는 Stop 통과 표시와 분리해 Stop 판정을 건너뛰지 않게 함
+# 질문별 해시로 기록해 작업 중 메시지로 묶음이 바뀌어도 이미 한 번 막은 질문은 PreToolUse에서 다시 막지 않음
 denied = mark + "-denied"
+question_hash = lambda prompt: hashlib.sha256(prompt.encode()).hexdigest()
 if event == "PreToolUse":
     try:
         with open(denied, encoding="utf-8") as previous:
-            if previous.read() == digest:
-                sys.exit(0)
+            denied_hashes = set(previous.read().split())
     except OSError:
-        # 표시가 없으면 이 질문 묶음으로 아직 수정을 막지 않은 상태
-        pass
+        # 표시가 없으면 이번 턴에 아직 수정을 막은 질문이 없는 상태
+        denied_hashes = set()
+    prompts = [p for p in prompts if question_hash(p) not in denied_hashes]
+    if not prompts:
+        sys.exit(0)
+    user_prompt = "\n---\n".join(prompts)[-MAX_PROMPT_CHARS:]
 
 turn_text = "\n".join(turn_texts).strip()
 if len(turn_text) > MAX_TURN_TEXT_CHARS:
@@ -168,23 +180,20 @@ judge_prompt = f"""[사용자 메시지](턴 시작 메시지, 작업 중에 보
 {turn_text}
 """
 
-def judge_command(output_path):
-    custom = os.environ.get("STOP_JUDGE_BIN")
-    if custom:
-        return [custom]
-    if os.environ["JUDGE_TOOL"] == "codex":
-        return ["codex", "exec", "-m", "gpt-6-luna", "-c", "model_reasoning_effort=\"medium\"", "--disable", "hooks",
-                "-s", "read-only", "--skip-git-repo-check", "--ephemeral", "-o", output_path, "-"]
-    return ["claude", "-p", "--safe-mode", "--model", "haiku", "--tools", "", "--no-session-persistence"]
+# 판정기 명령은 런타임별 단일 정의(.harness/judge_command.py)를 사용
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(os.environ["HOOK_SCRIPT"])))), ".harness"))
+from judge_command import judge_command, runtime
+JUDGE_KIND = runtime(os.environ["HOOK_SCRIPT"])
 
 def judge_once():
     # 판정기 오류의 None과 명시적 통과의 빈 문자열을 구분함
     try:
         with tempfile.TemporaryDirectory() as workdir:
             output_path = os.path.join(workdir, "verdict.txt")
+            command, stdin = judge_command(JUDGE_KIND, judge_prompt, output_path)
             result = subprocess.run(
-                judge_command(output_path),
-                input=judge_prompt,
+                command,
+                input=stdin,
                 capture_output=True,
                 text=True,
                 timeout=JUDGE_TIMEOUT_SECONDS,
@@ -219,8 +228,8 @@ if not question:
 question = question[:200]
 if event == "PreToolUse":
     os.makedirs(os.environ["MARK_DIR"], exist_ok=True)
-    with open(denied, "w", encoding="utf-8") as previous:
-        previous.write(digest)
+    with open(denied, "a", encoding="utf-8") as previous:
+        previous.write("".join(question_hash(p) + "\n" for p in prompts))
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",

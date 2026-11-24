@@ -7,7 +7,7 @@
 
 input=$(cat)
 
-printf '%s' "$input" | python3 -c '
+printf '%s' "$input" | HOOK_SCRIPT="$0" python3 -c '
 import json, os, re, sys
 
 BASH_WRITE = re.compile(
@@ -22,6 +22,8 @@ except Exception:
 
 if data.get("hook_event_name") != "PreToolUse" or data.get("agent_id"):
     sys.exit(0)
+# 승인 판정기 런타임 판별용(Codex는 이 .claude 사본을 등록함)
+os.environ["HOOK_TRANSCRIPT"] = str(data.get("transcript_path") or "")
 
 root = os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd") or os.getcwd()
 

@@ -110,6 +110,10 @@
 					{
 						"type": "command",
 						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" require-source-before-best-practice-edit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" block-reask-after-free-text-answer"
 					}
 				]
 			},
@@ -132,6 +136,15 @@
 					{
 						"type": "command",
 						"command": "sh \"$(git rev-parse --show-toplevel)/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
+					}
+				]
+			},
+			{
+				"matcher": "request_user_input_async|spawn_agent|send_message",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-reask-after-free-text-answer.sh\""
 					}
 				]
 			}
@@ -245,6 +258,10 @@
 						"type": "command",
 						"command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/workflow-gate.py\"",
 						"timeout": 60
+					},
+					{
+						"type": "command",
+						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-reask-after-free-text-answer.sh\" stop"
 					}
 				]
 			}

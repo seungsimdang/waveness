@@ -1701,6 +1701,10 @@ for (const tool of ['.claude', '.codex']) {
 		// 의문형 후보가 없는 작업 지시는 판정기를 부르지 않음
 		assert.deepEqual(decide('D16 답변 기록해', edit, unanswered), { result: 'allow', again: 'allow', called: false });
 		assert.equal(decide(question, bash('cat a.md 2>/dev/null'), unanswered).called, false);
+		// /dev/null 뒤에 셸 구분자가 붙어도 파일 쓰기가 아님
+		assert.equal(decide(question, bash('cat a.md 2>/dev/null; ls'), unanswered).called, false);
+		assert.equal(decide(question, bash('cat a.md 2>/dev/null|head'), unanswered).called, false);
+		assert.equal(decide(question, bash('echo 기록 >> a.md; ls'), unanswered).result, 'deny');
 		assert.equal(decide(question, bash("sed -i '' 's/a/b/' a.md"), unanswered).result, 'deny');
 		assert.equal(decide(question, bash('echo 기록 > a.md'), unanswered).result, 'deny');
 		assert.equal(decide(question, bash('python3 -c \'from pathlib import Path; Path("x").write_text("x")\''), unanswered).result, 'deny');
@@ -1941,6 +1945,7 @@ test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용�
  mkdirSync(join(project, '.harness'));
  writeFileSync(join(project, '.harness/paths'), '.claude/hooks/\n.codex/\n');
  writeFileSync(join(project, '.harness/harness_edit_approval.py'), readFileSync(join(H, '.harness/harness_edit_approval.py')));
+ writeFileSync(join(project, '.harness/judge_command.py'), readFileSync(join(H, '.harness/judge_command.py')));
  const file = join(project, '.claude/hooks/new.sh');
  const data = {hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: {file_path: file, content: 'new'}};
  const hash = input => createHash('sha256').update(JSON.stringify({input: input.tool_input, tool: input.tool_name}, (_key, value) => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value)).digest('hex');
@@ -1978,10 +1983,11 @@ else:
  setStub('claude', judgeScript('claude'));
  setStub('codex', '#!/bin/sh\nexit 1\n');
  setStub('agy', '#!/bin/sh\nexit 1\n');
- const call = (entries, input = data) => {
-  const transcript = join(project, 'transcript.jsonl');
+ const call = (entries, input = data, {transcriptDir = project, runtime} = {}) => {
+  mkdirSync(transcriptDir, {recursive: true});
+  const transcript = join(transcriptDir, 'transcript.jsonl');
   writeFileSync(transcript, entries.map(value => JSON.stringify(value)).join('\n'));
-  return spawnSync('sh', [join(H, '.claude/hooks/require-harness-lab-before-harness-edit.sh')], {input: JSON.stringify({...input, cwd: project, transcript_path: transcript}), encoding: 'utf8', env: {...env, CLAUDE_PROJECT_DIR: project, PATH: `${judgeBin}:${env.PATH}`}});
+  return spawnSync('sh', [join(H, '.claude/hooks/require-harness-lab-before-harness-edit.sh')], {input: JSON.stringify({...input, cwd: project, transcript_path: transcript}), encoding: 'utf8', env: {...env, CLAUDE_PROJECT_DIR: project, PATH: `${judgeBin}:${env.PATH}`, ...(runtime && {HARNESS_RUNTIME: runtime})}});
  };
  const approved = [blueprint(), message('user', '승인')];
  assert.equal(call(approved).status, 0);
@@ -2023,19 +2029,19 @@ print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 `);
  assert.equal(call([blueprint(oldPlan), message('user', '이전 질문 1'), message('user', '이전 질문 2'), blueprint(), message('user', '승인')]).status, 0);
  assert.equal(readFileSync(callLog, 'utf8').trim().split('\n').length, 1);
- // 1순위 claude 실패 -> 2순위 codex 폴백
+ // 판정기는 런타임별 하나만 쓰고 실패해도 다른 판정기로 넘어가지 않음
  setStub('claude', '#!/bin/sh\nexit 1\n');
  setStub('codex', judgeScript('codex'));
- assert.equal(call(approved).status, 0);
- assert.equal(call([...approved, message('user', '승인 취소')]).status, 2);
- // claude·codex 모두 실패 -> 3순위 agy 폴백
- setStub('codex', '#!/bin/sh\nexit 1\n');
  setStub('agy', judgeScript('agy'));
- assert.equal(call(approved).status, 0);
- assert.equal(call([...approved, message('user', '승인 취소')]).status, 2);
- // 모든 판정기 실패 -> 차단
- setStub('agy', '#!/bin/sh\nexit 1\n');
  assert.equal(call(approved).status, 2);
+ // Codex 세션 transcript(~/.codex/sessions)면 .claude 사본에서도 codex 판정기
+ const codexSessions = join(project, '.codex/sessions/2026');
+ assert.equal(call(approved, data, {transcriptDir: codexSessions}).status, 0);
+ assert.equal(call([...approved, message('user', '승인 취소')], data, {transcriptDir: codexSessions}).status, 2);
+ // Antigravity 어댑터가 넘긴 HARNESS_RUNTIME이면 agy 판정기
+ assert.equal(call(approved, data, {runtime: 'antigravity'}).status, 0);
+ setStub('agy', '#!/bin/sh\nexit 1\n');
+ assert.equal(call(approved, data, {runtime: 'antigravity'}).status, 2);
  // 이후 테스트를 위해 claude 복구
  setStub('claude', judgeScript('claude'));
  mkdirSync(join(project, '.claude/hooks'), {recursive: true});
@@ -2193,3 +2199,97 @@ for (const tool of ['.claude', '.codex']) {
 		});
 	});
 }
+
+for (const tool of ['.claude', '.codex']) test(`${tool} 질문 응답 훅이 한 번 막은 질문은 작업 중 메시지가 추가돼도 다시 막지 않고 새 질문만 판정`, () => {
+	withTmp('portfolio-answer-each-', tmp => {
+		const transcript = join(tmp, 'transcript.jsonl');
+		const captured = join(tmp, 'prompt.txt');
+		const bin = join(tmp, 'judge.sh');
+
+		writeFileSync(bin, `#!/bin/sh\ncat >"${captured}"\necho '{"unanswered": "질문"}'\n`);
+		chmodSync(bin, 0o755);
+
+		const write = entries => writeFileSync(transcript, `${entries.map(entry => JSON.stringify(entry)).join('\n')}\n`);
+		const call = input =>
+			spawnSync('sh', [resolve(H, tool, 'hooks', 'require-answer-before-edit.sh')], {
+				input: JSON.stringify({ session_id: 's1', transcript_path: transcript, ...input }),
+				encoding: 'utf8',
+				cwd: H,
+				env: { ...env, TMPDIR: tmp, STOP_JUDGE_BIN: bin }
+			}).stdout.trim();
+		const edit = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'a.md' } };
+		const start = { type: 'user', uuid: 'u1', message: { content: '왜 순서를 바꿈?' } };
+		const queued = prompt => ({ type: 'attachment', attachment: { type: 'queued_command', prompt } });
+
+		write([start]);
+		assert.notEqual(call(edit), '');
+		// 작업 중 질문이 추가되면 새 질문만 판정기에 넘김
+		write([start, queued('이건 오탐임?')]);
+		assert.notEqual(call(edit), '');
+		assert.ok(readFileSync(captured, 'utf8').includes('이건 오탐임?'));
+		assert.ok(!readFileSync(captured, 'utf8').includes('왜 순서를 바꿈?'));
+		// 두 질문 모두 한 번씩 막았으면 질문이 아닌 메시지가 추가돼도 통과
+		write([start, queued('이건 오탐임?'), queued('진행해')]);
+		assert.equal(call(edit), '');
+		// 턴 끝 Stop은 모든 질문을 판정
+		assert.notEqual(call({ hook_event_name: 'Stop', last_assistant_message: '진행합니다.' }), '');
+		assert.ok(readFileSync(captured, 'utf8').includes('왜 순서를 바꿈?'));
+	});
+});
+
+test('Codex 재질문 훅이 request_user_input_async 직접 입력 질문 뒤 수정을 막고 선택지 답과 새 메시지 뒤에는 허용', () => {
+	withTmp('portfolio-codex-reask-', tmp => {
+		const transcript = join(tmp, 'rollout.jsonl');
+		const message = text => ({ type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } });
+		const asked = {
+			type: 'response_item',
+			payload: {
+				type: 'function_call',
+				name: 'request_user_input_async',
+				call_id: 'c1',
+				arguments: JSON.stringify({ questions: [{ title: '높이', question: '높이?', options: ['고정', '부모'] }] })
+			}
+		};
+		const reply = answer =>
+			message(`<send_user_message_question_reply>\nuser: ${JSON.stringify([{ answer, question: '높이?', questionItemId: JSON.stringify(['request_user_input_async', 'c1', 0]) }])}\n</send_user_message_question_reply>`);
+		const decide = entries => {
+			writeFileSync(transcript, `${entries.map(entry => JSON.stringify(entry)).join('\n')}\n`);
+
+			const { stdout } = spawnSync('sh', [resolve(H, '.codex/hooks/block-reask-after-free-text-answer.sh')], {
+				input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Edit', transcript_path: transcript }),
+				encoding: 'utf8',
+				cwd: H,
+				env
+			});
+
+			return stdout.trim() ? JSON.parse(stdout).hookSpecificOutput.permissionDecision : 'allow';
+		};
+
+		assert.equal(decide([message('나머지 질문해'), asked, reply('레퍼런스는 어떻게 되어있음?')]), 'deny');
+		assert.equal(decide([message('나머지 질문해'), asked, reply('고정')]), 'allow');
+		assert.equal(decide([message('나머지 질문해'), asked, reply('왜 고정임?'), message('ㄱㄱ')]), 'allow');
+		assert.equal(
+			readFileSync(resolve(H, '.codex/hooks/block-reask-after-free-text-answer.sh'), 'utf8'),
+			readFileSync(resolve(H, '.claude/hooks/block-reask-after-free-text-answer.sh'), 'utf8')
+		);
+	});
+});
+
+test('판정기 명령은 런타임별 하나로 정하고 effort는 모두 medium', () => {
+	const pick = (script, transcript = '', runtime = '') =>
+		JSON.parse(
+			spawnSync('python3', ['-c', `import json,sys; sys.path.insert(0, ${JSON.stringify(resolve(H, '.harness'))}); from judge_command import judge_command, runtime; k = runtime(sys.argv[1], sys.argv[2]); print(json.dumps([k, judge_command(k, "P", "/o")[0]]))`, script, transcript], {
+				encoding: 'utf8',
+				env: { ...env, STOP_JUDGE_BIN: '', HARNESS_RUNTIME: runtime }
+			}).stdout
+		);
+	const [claudeKind, claude] = pick('/p/.claude/hooks/x.sh');
+	const [codexKind, codex] = pick('/p/.codex/hooks/x.sh');
+	const [codexSessionKind] = pick('/p/.claude/hooks/x.sh', '/u/.codex/sessions/2026/r.jsonl');
+	const [agyKind, agy] = pick('/p/.codex/hooks/x.sh', '', 'antigravity');
+
+	assert.deepEqual([claudeKind, codexKind, codexSessionKind, agyKind], ['claude', 'codex', 'codex', 'antigravity']);
+	assert.deepEqual(claude.slice(0, 8), ['claude', '-p', '--safe-mode', '--model', 'haiku', '--effort', 'medium', '--tools']);
+	assert.ok(codex.includes('gpt-6-luna') && codex.includes('model_reasoning_effort="medium"'));
+	assert.ok(agy.includes('--sandbox') && agy.includes('gemini-4-hydrogen-medium') && agy[agy.indexOf('--effort') + 1] === 'medium');
+});

@@ -4,7 +4,7 @@
 # 질문 응답 여부는 require-answer-before-edit.sh, 응답의 근거는 judge-unverified-claims.sh, 답 형식 안내는 require-single-best-practice.sh가 맡음
 # 조회 여부는 판단이 필요 없는 사실이라 판정기 없이 규칙으로만 판정함
 # 결론을 먼저 공유했는지와 출처가 결론을 뒷받침하는지는 판정 범위 밖임
-# Claude transcript와 Codex JSONL을 모두 읽고, 입력이나 transcript를 해석할 수 없으면 통과
+# Claude transcript, Codex JSONL, Antigravity transcript(USER_INPUT·PLANNER_RESPONSE)를 모두 읽고, 입력이나 transcript를 해석할 수 없으면 통과
 
 input=$(cat)
 
@@ -14,13 +14,13 @@ import json, re, sys
 KEYWORD = re.compile(r"best[ _-]?practice|베스트[ ]?프랙티스", re.I)
 DELEGATE = re.compile(r"판단|처리|적용|알아서")
 LOOKUP = re.compile(
-    r"^(WebSearch|WebFetch|web_search)$|^mcp__context7__|^mcp__.*(search_docs|get_doc|query-docs|search_vercel_documentation)$"
+    r"^(WebSearch|WebFetch|web_search|search_web)$|^mcp__context7__|^mcp__.*(search_docs|get_doc|query-docs|search_vercel_documentation)$"
 )
 BASH_WRITE = re.compile(
     r"\bsed\s+(-\w+\s+)*-i|\btee\b|(^|[\s;&|(])(cp|mv|rm|mkdir|touch)\s"
     r"|open\([^)]*[\"\x27][wa]|\.(write|write_text|write_bytes)\s*\(|writeFileSync|\bgit\s+(commit|apply|checkout|restore|reset|stash|add|rm|mv)\b"
 )
-REDIRECT = re.compile(r"[\x27][^\x27]*[\x27]|\"(?:\\.|[^\"\\])*\"|\\.|(?P<output>(?<![<>])>>?\s*(?![>&\s]|/dev/null(?:\s|$))\S)")
+REDIRECT = re.compile(r"[\x27][^\x27]*[\x27]|\"(?:\\.|[^\"\\])*\"|\\.|(?P<output>(?<![<>])>>?\s*(?![>&\s]|/dev/null(?:[\s;&|)]|$))\S)")
 
 try:
     data = json.load(sys.stdin)
@@ -68,6 +68,16 @@ for entry in entries:
             events.append(("tool", None, True))
         elif payload.get("type") in ("function_call", "custom_tool_call"):
             events.append(("tool", None, bool(LOOKUP.search(str(payload.get("name") or "")))))
+        continue
+    if entry.get("type") == "USER_INPUT" and isinstance(entry.get("content"), str):
+        # Antigravity transcript: 요청 본문만 쓰고 메타데이터 블록은 제외
+        match = re.search(r"<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>", entry["content"], re.S)
+        events.append(("turn", match.group(1) if match else entry["content"], False))
+        continue
+    if entry.get("type") == "PLANNER_RESPONSE":
+        for call in entry.get("tool_calls") or []:
+            if isinstance(call, dict):
+                events.append(("tool", None, bool(LOOKUP.search(str(call.get("name") or "")))))
         continue
     content = (entry.get("message") or {}).get("content")
     attachment = entry.get("attachment") or {}

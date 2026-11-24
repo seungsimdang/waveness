@@ -117,42 +117,14 @@ def approval_decision(plan, text):
     judge_env = {**os.environ, "HARNESS_STOP_JUDGE": "1"}
     with tempfile.TemporaryDirectory() as workdir:
         output = Path(workdir, "decision.json")
-        # 1순위 claude, 실패 시 codex -> agy 순으로 폴백
-        backends = [
-            (
-                [
-                    "claude", "-p", "--safe-mode", "--model", "haiku",
-                    "--effort", "medium", "--tools", "", "--no-session-persistence",
-                ],
-                payload,
-                None,
-            ),
-            (
-                [
-                    "codex", "exec", "--ephemeral", "--disable", "hooks",
-                    "-m", "gpt-6-luna", "-c", "model_reasoning_effort=\"medium\"",
-                    "-s", "read-only", "--skip-git-repo-check",
-                    "--color", "never", "-o", str(output), "-",
-                ],
-                payload,
-                output,
-            ),
-            (
-                [
-                    "agy", "--disable-slash-commands", "--output-format", "text",
-                    "--sandbox", "--print-timeout", "40s",
-                    "--model", "gemini-4-hydrogen-medium", "--effort", "medium",
-                    "-p", payload,
-                ],
-                None,
-                None,
-            ),
-        ]
-        for command, stdin_data, output_path in backends:
-            raw = _run_judge(command, stdin_data, workdir, judge_env, output_path)
-            decision = _parse_verdict(raw, text)
-            if decision is not None:
-                return decision
+        # 판정기는 런타임별 단일 정의를 사용, 실패해도 다른 판정기로 넘어가지 않음
+        from judge_command import judge_command, runtime
+
+        command, stdin_data = judge_command(runtime(os.environ.get("HOOK_SCRIPT", ""), os.environ.get("HOOK_TRANSCRIPT", "")), payload, str(output))
+        raw = _run_judge(command, stdin_data, workdir, judge_env, output if command[0] == "codex" else None)
+        decision = _parse_verdict(raw, text)
+        if decision is not None:
+            return decision
     return None
 
 

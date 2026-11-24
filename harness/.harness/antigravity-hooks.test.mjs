@@ -245,6 +245,7 @@ test('Antigravity PreToolUse edit_file에서 승인된 harness-plan 청사진이
 			join(project, '.harness/harness_edit_approval.py'),
 			readFileSync(join(H, '.harness/harness_edit_approval.py'))
 		);
+		writeFileSync(join(project, '.harness/judge_command.py'), readFileSync(join(H, '.harness/judge_command.py')));
 
 		const hookPath = join(project, '.claude/hooks/require-harness-lab-before-harness-edit.sh');
 
@@ -259,13 +260,14 @@ test('Antigravity PreToolUse edit_file에서 승인된 harness-plan 청사진이
 
 		writeFileSync(targetFile, 'old\n');
 
-		const claudeMock = join(project, 'bin/claude');
+		// Antigravity 어댑터는 HARNESS_RUNTIME=antigravity를 넘겨 agy 판정기만 사용
+		const claudeMock = join(project, 'bin/agy');
 
 		writeFileSync(
 			claudeMock,
 			`#!/usr/bin/env python3
 import json, sys
-request = json.load(sys.stdin)
+request = json.loads(sys.argv[sys.argv.index("-p") + 1])
 text = request["user_reply"].strip()
 if text == "승인":
     decision = "approve"
@@ -277,7 +279,7 @@ print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 `
 		);
 		chmodSync(claudeMock, 0o755);
-		for (const fallback of ['codex', 'agy']) {
+		for (const fallback of ['codex', 'claude']) {
 			const stub = join(project, 'bin', fallback);
 
 			writeFileSync(stub, '#!/bin/sh\nexit 1\n');
@@ -359,4 +361,97 @@ print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 	} finally {
 		rmSync(project, { recursive: true, force: true });
 	}
+});
+
+// Antigravity transcript(USER_INPUT·PLANNER_RESPONSE·GENERIC) 표본으로 공용 질문 훅을 어댑터 경유로 실행
+function withAgyTranscript(rows, run) {
+	const dir = mkdtempSync(join(tmpdir(), 'agy-hooks-'));
+
+	try {
+		const transcript = join(dir, 'transcript_full.jsonl');
+
+		writeFileSync(transcript, `${rows.map(row => JSON.stringify(row)).join('\n')}\n`);
+
+		return run(transcript, dir);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+const agyUser = text => ({ type: 'USER_INPUT', content: `<USER_REQUEST>\n${text}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nx\n</ADDITIONAL_METADATA>` });
+const agyReply = text => ({ type: 'PLANNER_RESPONSE', content: text });
+const agyEdit = transcriptPath => ({
+	toolCall: { id: 'e1', name: 'edit_file', args: { Path: join(H, 'a.md'), Target: 'a', Replacement: 'b' } },
+	transcriptPath,
+	cwd: H
+});
+
+test('Antigravity 질문 응답 훅이 USER_INPUT 질문을 agy 런타임 판정기에 넘기고 미답변이면 수정을 막음', () => {
+	withAgyTranscript([agyUser('이거 왜 막힘?')], (transcript, dir) => {
+		const judge = join(dir, 'judge.sh');
+		const captured = join(dir, 'captured.txt');
+
+		writeFileSync(judge, `#!/bin/sh\necho "$HARNESS_RUNTIME" >"${captured}"\ncat >>"${captured}"\necho '{"unanswered": "이거 왜 막힘?"}'\n`);
+		chmodSync(judge, 0o755);
+
+		const out = runAdapter('pre-tool-edit', 'require-answer-before-edit', agyEdit(transcript), { STOP_JUDGE_BIN: judge, TMPDIR: dir });
+		const prompt = readFileSync(captured, 'utf8');
+
+		assert.equal(out.decision, 'deny');
+		assert.ok(prompt.startsWith('antigravity\n'));
+		assert.ok(prompt.includes('이거 왜 막힘?'));
+		assert.ok(!prompt.includes('ADDITIONAL_METADATA'));
+	});
+	// 응답 텍스트(PLANNER_RESPONSE.content)가 판정기 입력에 들어감
+	withAgyTranscript([agyUser('이거 왜 막힘?'), agyReply('리다이렉트 정규식 오탐입니다.')], (transcript, dir) => {
+		const judge = join(dir, 'judge.sh');
+		const captured = join(dir, 'captured.txt');
+
+		writeFileSync(judge, `#!/bin/sh\ncat >"${captured}"\necho '{"unanswered": null}'\n`);
+		chmodSync(judge, 0o755);
+
+		const out = runAdapter('pre-tool-edit', 'require-answer-before-edit', agyEdit(transcript), { STOP_JUDGE_BIN: judge, TMPDIR: dir });
+
+		assert.equal(out.decision, 'allow');
+		assert.ok(readFileSync(captured, 'utf8').includes('리다이렉트 정규식 오탐입니다.'));
+	});
+});
+
+test('Antigravity best practice 출처 훅이 search_web 조회 전에는 막고 조회 뒤에는 허용함', () => {
+	const ask = agyUser('best practice대로 판단해서 적용해');
+
+	withAgyTranscript([ask], transcript => {
+		assert.equal(runAdapter('pre-tool-edit', 'require-source-before-best-practice-edit', agyEdit(transcript)).decision, 'deny');
+	});
+	withAgyTranscript([ask, { type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'search_web', args: { query: 'x' } }] }], transcript => {
+		assert.equal(runAdapter('pre-tool-edit', 'require-source-before-best-practice-edit', agyEdit(transcript)).decision, 'allow');
+	});
+});
+
+test('Antigravity 재질문 훅이 ask_question 직접 입력 질문 뒤 수정·재질문을 막고 선택지 답과 새 메시지 뒤에는 허용함', () => {
+	const questions = [{ question: '높이?', options: ['(Recommended) 고정', '부모'], is_multi_select: false }];
+	const asked = [agyUser('나머지 질문해'), { type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'ask_question', args: { questions } }] }];
+	const answer = text => ({ type: 'GENERIC', content: `Created At: x\nCompleted At: x\nA1: ${text}` });
+	const askCall = transcriptPath => ({ toolCall: { id: 'q1', name: 'ask_question', args: { questions } }, transcriptPath, cwd: H });
+
+	withAgyTranscript([...asked, answer('레퍼런스는 어떻게 되어있음?')], transcript => {
+		assert.equal(runAdapter('pre-tool-edit', 'block-reask-after-free-text-answer', agyEdit(transcript)).decision, 'deny');
+		assert.equal(runAdapter('pre-tool-ask', 'block-reask-after-free-text-answer', askCall(transcript)).decision, 'deny');
+	});
+	withAgyTranscript([...asked, answer('(Recommended) 고정')], transcript => {
+		assert.equal(runAdapter('pre-tool-edit', 'block-reask-after-free-text-answer', agyEdit(transcript)).decision, 'allow');
+	});
+	withAgyTranscript([...asked, answer('왜 고정임?'), agyUser('ㄱㄱ')], transcript => {
+		assert.equal(runAdapter('pre-tool-edit', 'block-reask-after-free-text-answer', agyEdit(transcript)).decision, 'allow');
+	});
+});
+
+test('Antigravity hooks.json이 질문 훅 3종을 등록하고 어댑터가 실행할 스크립트가 있음', () => {
+	const config = JSON.parse(readFileSync(join(H, '.agents/hooks.json'), 'utf8'))['harness-guards'];
+	const commands = JSON.stringify(config);
+
+	for (const hook of ['require-answer-before-edit', 'require-source-before-best-practice-edit', 'block-reask-after-free-text-answer']) {
+		assert.ok(commands.includes(hook), hook);
+	}
+	assert.ok(config.PreToolUse.some(({ matcher, hooks }) => matcher === 'ask_question' && hooks.some(({ command }) => command.includes('pre-tool-ask'))));
 });

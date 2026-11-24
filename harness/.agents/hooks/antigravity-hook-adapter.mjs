@@ -1,6 +1,6 @@
 // Antigravity(Gemini) 훅 입력(camelCase)을 Claude·Codex 공용 훅 형식으로 변환해 실행하는 어댑터
 // 사용법: node .agents/hooks/antigravity-hook-adapter.mjs <event> <hook-name> (stdin JSON)
-// event: session-start | pre-tool-bash | pre-tool-edit | pre-tool-swarm | post-tool-edit | stop
+// event: session-start | pre-tool-bash | pre-tool-ask | pre-tool-edit | pre-tool-swarm | post-tool-edit | stop
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -152,7 +152,7 @@ function handlePreToolBash(input, hookName) {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
 		encoding: 'utf8',
-		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT }
+		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
 	});
 
 	return toPreToolDecision(result);
@@ -191,6 +191,31 @@ function toEditPayload(input, eventName) {
 	};
 }
 
+// ask_question을 AskUserQuestion 형식으로 넘겨 질문 창 관련 훅을 공용 본문으로 판정
+function handlePreToolAsk(input, hookName) {
+	const script = resolveHookScript(hookName);
+
+	if (!script) return { decision: 'allow' };
+
+	const args = input.toolCall?.args ?? {};
+	const payload = {
+		hook_event_name: 'PreToolUse',
+		tool_name: 'AskUserQuestion',
+		tool_input: { questions: args.questions ?? [] },
+		cwd: input.cwd || HARNESS_ROOT,
+		transcript_path: resolveTranscriptPath(input.transcriptPath),
+		session_id: input.conversationId ?? ''
+	};
+	const result = spawnSync('sh', [script], {
+		cwd: input.cwd || HARNESS_ROOT,
+		input: JSON.stringify(payload),
+		encoding: 'utf8',
+		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
+	});
+
+	return toPreToolDecision(result);
+}
+
 function handlePreToolEdit(input, hookName) {
 	const script = resolveHookScript(hookName);
 
@@ -201,7 +226,7 @@ function handlePreToolEdit(input, hookName) {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
 		encoding: 'utf8',
-		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT }
+		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
 	});
 
 	return toPreToolDecision(result);
@@ -219,7 +244,7 @@ function handlePostToolEdit(input, hookName) {
 			cwd: input.cwd || HARNESS_ROOT,
 			input: JSON.stringify(input),
 			encoding: 'utf8',
-			env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT }
+			env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
 		});
 
 		return {};
@@ -235,7 +260,7 @@ function handlePostToolEdit(input, hookName) {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
 		encoding: 'utf8',
-		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT }
+		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
 	});
 
 	return {};
@@ -262,7 +287,7 @@ function handleStop(input, hookName) {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
 		encoding: 'utf8',
-		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT }
+		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
 	});
 	const stdout = (result.stdout ?? '').trim();
 	const stderr = (result.stderr ?? '').trim();
@@ -341,6 +366,9 @@ switch (event) {
 		break;
 	case 'pre-tool-bash':
 		output = handlePreToolBash(input, hookName);
+		break;
+	case 'pre-tool-ask':
+		output = handlePreToolAsk(input, hookName);
 		break;
 	case 'pre-tool-edit':
 		output = handlePreToolEdit(input, hookName);

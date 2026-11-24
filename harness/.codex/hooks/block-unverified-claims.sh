@@ -4,14 +4,14 @@
 # 코드 표기와 큰따옴표 인용은 규칙을 설명하는 문장일 수 있어 판정에서 뺌
 # Codex 전용 정규식 판정으로, Claude는 같은 목적을 settings.json의 Stop prompt 훅(LLM 판정)으로 처리함
 # Codex hooks는 prompt·agent 핸들러를 실행하지 않아 이 방식을 유지함(https://developers.openai.com/codex/hooks)
-# 자기 행동 이유를 묻는 질문에 원인 없이 경위만 답한 것은 정규식으로 가릴 수 없어, Claude판처럼 CLI(codex exec)로 LLM 판정함
+# 자기 행동 이유를 묻는 질문에 원인 없이 경위만 답한 것은 정규식으로 가릴 수 없어, Claude판처럼 CLI로 LLM 판정함(Codex는 codex exec, Antigravity는 agy)
 # 질문은 require-why-explanation.sh가 turn_id별로 저장해 둔 것을 씀. 판정 호출은 --disable hooks와 환경변수로 재귀를 막고, 실패하면 통과시킴
 
 [ -n "${HARNESS_STOP_JUDGE:-}" ] && exit 0
 
 input=$(cat)
 
-printf '%s' "$input" | DEFERRED_PATTERN_FILE="$(dirname "$0")/../../.harness/deferred-claims-pattern.txt" MARK_DIR="${TMPDIR:-/tmp}/codex-why-judge" python3 -c '
+printf '%s' "$input" | HOOK_SCRIPT="$0" DEFERRED_PATTERN_FILE="$(dirname "$0")/../../.harness/deferred-claims-pattern.txt" MARK_DIR="${TMPDIR:-/tmp}/codex-why-judge" python3 -c '
 import json, os, re, subprocess, sys, tempfile
 
 JUDGE_TIMEOUT_SECONDS = 60
@@ -154,20 +154,22 @@ prompt = f"""너는 Codex 응답 검토기다. 아래 [마지막 응답]을 판�
 {answer}
 """
 
-command = ["codex", "exec", "--ephemeral", "--disable", "hooks", "-s", "read-only", "--skip-git-repo-check", "--color", "never"]
-if os.environ.get("CODEX_STOP_JUDGE_MODEL"):
-    command += ["-m", os.environ["CODEX_STOP_JUDGE_MODEL"]]
+# 판정기 명령은 런타임별 단일 정의(.harness/judge_command.py)를 사용, 이 사본은 Codex와 Antigravity가 실행
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(os.environ["HOOK_SCRIPT"])))), ".harness"))
+from judge_command import judge_command, runtime
 try:
     with tempfile.NamedTemporaryFile("r", suffix=".txt", encoding="utf-8") as out:
-        subprocess.run(
-            command + ["-o", out.name, "-"],
-            input=prompt,
+        command, stdin = judge_command(runtime(os.environ["HOOK_SCRIPT"]), prompt, out.name)
+        result = subprocess.run(
+            command,
+            input=stdin,
             capture_output=True,
             text=True,
             timeout=JUDGE_TIMEOUT_SECONDS,
             env={**os.environ, "HARNESS_STOP_JUDGE": "1"},
         )
-        verdict = json.loads(re.search(r"\{.*\}", out.read(), re.S).group(0))
+        # codex는 -o 파일에, claude·agy는 표준출력에 판정을 씀
+        verdict = json.loads(re.search(r"\{.*\}", out.read() or result.stdout, re.S).group(0))
 except Exception:
     # 판정기 호출이나 응답 해석이 실패하면 작업을 막지 않고 통과
     sys.exit(0)

@@ -1,5 +1,14 @@
 # 하네스 변경 이력
 
+## 2026-11-24 feat(harness): 질문 훅 3종 Antigravity·Codex판 추가 및 LLM 판정기 런타임별 통일
+
+> - `.harness/judge_command.py` 추가: 판정기를 런타임별 하나로 고정(Claude haiku, Codex gpt-6-luna, Antigravity gemini-4-hydrogen-medium, effort 모두 medium), `harness_edit_approval.py`의 claude→codex→agy 폴백 제거
+> - `require-answer-before-edit`·`require-feasibility-verdict`·`block-unverified-claims`·`harness_edit_approval.py`가 공용 판정기 사용, Codex가 `.claude` 사본을 등록한 훅은 `~/.codex/sessions` transcript 위치로 Codex 판별
+> - Antigravity 어댑터에 `HARNESS_RUNTIME=antigravity`·`pre-tool-ask`(ask_question) 추가, `require-answer-before-edit`·`require-source-before-best-practice-edit`·`block-reask-after-free-text-answer`가 Antigravity transcript(USER_INPUT·PLANNER_RESPONSE·GENERIC)를 해석하고 `.agents/hooks.json`에 등록
+> - `block-reask-after-free-text-answer` Codex판 추가(`request_user_input_async` 질문과 `send_user_message_question_reply` 답 해석), Stop 이벤트로 Stop 모드 판별
+> - `require-answer-before-edit` 1회 차단 표시를 질문별 해시로 바꿔 작업 중 메시지 뒤 같은 질문 재차단 방지, 출력 리다이렉트 판정이 `2>/dev/null;`처럼 구분자가 붙은 `/dev/null`을 쓰기로 오판하던 문제 수정
+> - 회귀 테스트 추가 및 `docs/agent-harness/README.md` 런타임 배치 갱신
+
 ## 2026-11-24 fix(harness): 답변 요구 턴 질문 창 차단 및 한화 공용 동기화 충돌 해결
 
 - Harness-Origin: `HanwhaAdvancedMaterials-monitoring-frontend@751788f0b190b04ef275fdebaf96488079da64d1`

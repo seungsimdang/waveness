@@ -6,20 +6,15 @@
 # 질문 여부는 UserPromptSubmit의 prompt로 판정하고, Stop은 transcript에서 이번 턴 첫 응답만 읽음
 # transcript 형식은 안정 인터페이스가 아니라서 읽지 못하면 마지막 응답으로 판정함
 # 키워드·의문형 패턴은 후보만 고르고, 차단 직전에 LLM이 실제 가능 여부 질문인지 다시 판정함
-# 판정은 Claude가 haiku, Codex가 gpt-6-luna(effort medium)를 쓰고, 판정 실패·타임아웃·해석 불가는 작업을 막지 않도록 통과시킴
+# 판정기는 런타임별(Claude haiku, Codex gpt-6-luna, Antigravity gemini-4-hydrogen-medium, effort 모두 medium)이고, 판정 실패·타임아웃·해석 불가는 작업을 막지 않도록 통과시킴
 # 판정 호출은 hooks를 끄고 환경변수로도 재귀를 막음
-# Claude와 Codex가 같은 본문을 쓰고, 판정 CLI는 스크립트 위치로 고름
+# Claude와 Codex가 같은 본문을 쓰고, 판정 CLI는 .harness/judge_command.py가 HARNESS_RUNTIME과 스크립트 위치로 고름
 
 [ -n "${HARNESS_STOP_JUDGE:-}" ] && exit 0
 
-case "$0" in
-  *.codex/*) judge_tool=codex ;;
-  *) judge_tool=claude ;;
-esac
-
 input=$(cat)
 
-printf '%s' "$input" | JUDGE_TOOL="$judge_tool" MARK_DIR="${TMPDIR:-/tmp}/feasibility-verdict" python3 -c '
+printf '%s' "$input" | HOOK_SCRIPT="$0" MARK_DIR="${TMPDIR:-/tmp}/feasibility-verdict" python3 -c '
 import json, os, re, stat, subprocess, sys, tempfile
 
 JUDGE_TIMEOUT_SECONDS = 60
@@ -225,21 +220,18 @@ split: [답변]이 첫머리 판정을 내린 뒤 "범위가 나뉜다", "일부
 {judge_body}
 """
 
-def judge_command(output_path):
-    custom = os.environ.get("STOP_JUDGE_BIN")
-    if custom:
-        return [custom]
-    if os.environ["JUDGE_TOOL"] == "codex":
-        return ["codex", "exec", "-m", "gpt-6-luna", "-c", "model_reasoning_effort=\"medium\"", "--disable", "hooks",
-                "-s", "read-only", "--skip-git-repo-check", "--ephemeral", "-o", output_path, "-"]
-    return ["claude", "-p", "--safe-mode", "--model", "haiku", "--tools", "", "--no-session-persistence"]
+# 판정기 명령은 런타임별 단일 정의(.harness/judge_command.py)를 사용
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(os.environ["HOOK_SCRIPT"])))), ".harness"))
+from judge_command import judge_command, runtime
+JUDGE_KIND = runtime(os.environ["HOOK_SCRIPT"])
 
 try:
     with tempfile.TemporaryDirectory() as workdir:
         output_path = os.path.join(workdir, "verdict.txt")
+        command, stdin = judge_command(JUDGE_KIND, judge_prompt, output_path)
         result = subprocess.run(
-            judge_command(output_path),
-            input=judge_prompt,
+            command,
+            input=stdin,
             capture_output=True,
             text=True,
             timeout=JUDGE_TIMEOUT_SECONDS,

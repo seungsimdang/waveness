@@ -1,5 +1,5 @@
 #!/bin/sh
-# PreToolUse(Edit·Write·NotebookEdit·Agent·SendMessage·AskUserQuestion) 훅: 마지막 사용자 메시지 이후 AskUserQuestion 답변에 선택지 밖 직접 입력 질문이 있으면 같은 응답이 끝날 때까지 수정·위임·재질문 차단
+# PreToolUse(Edit·Write·NotebookEdit·Agent·SendMessage·AskUserQuestion, Codex request_user_input_async, Antigravity ask_question) 훅: 마지막 사용자 메시지 이후 AskUserQuestion 답변에 선택지 밖 직접 입력 질문이 있으면 같은 응답이 끝날 때까지 수정·위임·재질문 차단
 # 답변 직후 질문 창이 뜨면 답변 텍스트가 가려지므로 텍스트로 답하고 응답 종료를 유도
 # Read·Grep·Bash는 답변 조사용으로 허용
 # 질문 판정: 물음표, 의문형 어미(~까/나요/가요/니/냐/는지 등), 의문사(왜/뭐/무슨/어떻게 등)
@@ -7,12 +7,17 @@
 # ponytail: 키워드 판정이라 '어느 쪽이든 해' 같은 지시도 질문으로 잡힘(차단 쪽 오탐)
 # 놓친 질문이 질문 창에 가려지는 것보다 안전
 # subagent 호출은 사용자 답변과 무관한 작업이라 제외
+# Antigravity(HARNESS_RUNTIME=antigravity)는 ask_question 다음 GENERIC 항목의 A{n}: 답변으로 판정
+# Codex(.codex 사본)는 request_user_input_async 질문과 send_user_message_question_reply 답변으로 판정
+# Claude와 Codex가 같은 본문을 씀
 # 트랜스크립트 형식이 바뀌거나 읽을 수 없으면 차단하지 않음
 # stop 인자 모드(Stop 훅): 같은 판정으로 차단이 풀려 있는데 마지막 응답이 "다음 메시지 후 질문 창으로 묻겠다"처럼 질문을 미루면 1회 차단
 # stop 인자 모드에서도 이번 턴 사용자 메시지가 질문·답변 요구면 미루기 허용
 
 mode=${1:-pretool}
 input=$(cat)
+# Antigravity 어댑터는 인자 없이 실행하므로 이벤트 이름으로 Stop 모드 판별
+[ "$(printf '%s' "$input" | jq -r '.hook_event_name // empty' 2>/dev/null)" = "Stop" ] && mode=stop
 [ -z "$(printf '%s' "$input" | jq -r '.agent_id // empty' 2>/dev/null)" ] || exit 0
 transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
 [ -n "$transcript" ] && [ -r "$transcript" ] || exit 0
@@ -20,6 +25,90 @@ transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/nul
 # jq -R은 4095바이트 넘는 줄에서 한글 등 멀티바이트 문자가 읽기 경계에 걸리면 깨뜨려 선택지 라벨 비교가 어긋나므로 JSON으로 직접 읽음
 # 다른 세션·subagent 메시지(origin.kind == "peer")는 isMeta로 기록되지만 새 턴을 시작하므로 사용자 메시지처럼 초기화
 question_re='[?？]|(까요?|나요|가요|니|냐|는지|은지|인지|던가|건가|인가)[[:space:].!~]*$|왜|뭐|뭔|무슨|무엇|어떻게|어디|언제|누가|누구|어느|몇'
+if [ "${HARNESS_RUNTIME:-}" = antigravity ]; then
+  # Antigravity transcript: USER_INPUT에서 초기화, ask_question 다음 GENERIC 항목의 "A{n}: 답"을 선택지와 비교
+  free_text=$(QUESTION_RE="$question_re" python3 -c '
+import json, os, re, sys
+
+pattern = re.compile(os.environ["QUESTION_RE"])
+free = False
+pending = None
+try:
+    with open(sys.argv[1], encoding="utf-8") as lines:
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except Exception:
+                continue
+            kind = entry.get("type")
+            if kind == "USER_INPUT":
+                free, pending = False, None
+            elif kind == "PLANNER_RESPONSE":
+                calls = [c for c in entry.get("tool_calls") or [] if isinstance(c, dict) and c.get("name") == "ask_question"]
+                if calls:
+                    pending = (calls[-1].get("args") or {}).get("questions") or []
+                    if isinstance(pending, str):
+                        pending = json.loads(pending)
+            elif kind == "GENERIC" and pending is not None:
+                for number, answer in re.findall(r"^A(\d+): (.*)$", str(entry.get("content") or ""), re.M):
+                    index = int(number) - 1
+                    question = pending[index] if index < len(pending) else {}
+                    options = [str(o) for o in question.get("options") or []]
+                    parts = answer.split(", ") if question.get("is_multi_select") else [answer]
+                    if not set(parts) <= set(options) and pattern.search(re.sub(r"https?://\S+", "", answer)):
+                        free = True
+                pending = None
+except Exception:
+    free = False
+print("true" if free else "false")
+' "$transcript" 2>/dev/null)
+elif case "$0" in *.codex/*) true ;; *) false ;; esac; then
+  # Codex JSONL: 일반 사용자 메시지에서 초기화, request_user_input_async 질문의 선택지와 send_user_message_question_reply 답을 비교
+  free_text=$(QUESTION_RE="$question_re" python3 -c '
+import json, os, re, sys
+
+pattern = re.compile(os.environ["QUESTION_RE"])
+free = False
+calls = {}
+try:
+    with open(sys.argv[1], encoding="utf-8") as lines:
+        for line in lines:
+            try:
+                payload = json.loads(line).get("payload") or {}
+            except Exception:
+                continue
+            if payload.get("type") == "function_call" and payload.get("name") == "request_user_input_async":
+                try:
+                    calls[payload.get("call_id")] = json.loads(payload.get("arguments") or "{}").get("questions") or []
+                except Exception:
+                    calls[payload.get("call_id")] = []
+            elif payload.get("type") == "message" and payload.get("role") == "user":
+                text = "\n".join(c.get("text", "") for c in payload.get("content") or [] if isinstance(c, dict))
+                if text.lstrip().startswith(("<hook_prompt", "<codex_internal_context")):
+                    continue
+                marker = text.find("<send_user_message_question_reply>")
+                if marker < 0:
+                    free = False
+                    continue
+                start = text.find("[", marker)
+                try:
+                    replies = json.JSONDecoder().raw_decode(text[start:])[0] if start >= 0 else []
+                except Exception:
+                    replies = []
+                for reply in replies:
+                    answer = str(reply.get("answer") or "")
+                    try:
+                        _, call_id, index = json.loads(reply.get("questionItemId") or "[]")
+                        options = [str(o) for o in (calls.get(call_id) or [])[index].get("options") or []]
+                    except Exception:
+                        options = []
+                    if answer not in options and pattern.search(re.sub(r"https?://\S+", "", answer)):
+                        free = True
+except Exception:
+    free = False
+print("true" if free else "false")
+' "$transcript" 2>/dev/null)
+else
 free_text=$(jq -n --arg re "$question_re" '
   def selected($labels):
     . as $answer | any($labels[];
@@ -42,6 +131,7 @@ free_text=$(jq -n --arg re "$question_re" '
     ] | length > 0)
     else . end)
 ' "$transcript" 2>/dev/null)
+fi
 
 if [ "$mode" = "stop" ]; then
   [ "$free_text" = "false" ] || exit 0
@@ -70,6 +160,15 @@ try:
             try:
                 entry = json.loads(line)
             except Exception:
+                continue
+            payload = entry.get("payload") or {}
+            if payload.get("type") == "message" and payload.get("role") == "user":
+                text = "\n".join(c.get("text", "") for c in payload.get("content") or [] if isinstance(c, dict))
+                if text.strip() and not text.lstrip().startswith(("<hook_prompt", "<codex_internal_context")):
+                    last_prompt = text
+                continue
+            if entry.get("type") == "USER_INPUT" and isinstance(entry.get("content"), str):
+                last_prompt = entry["content"]
                 continue
             if entry.get("type") != "user" or entry.get("isMeta"):
                 continue

@@ -23,6 +23,14 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-manual-merge-repo"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash require-answer-before-edit"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash require-source-before-best-practice-edit"
           }
         ]
       },
@@ -40,6 +48,18 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-coderabbit-run"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-answer-before-edit"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-source-before-best-practice-edit"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-reask-after-free-text-answer"
           }
         ]
       },
@@ -58,6 +78,19 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-swarm verify-swarm-role"
+          }
+        ]
+      },
+      {
+        "matcher": "ask_question",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-ask require-answer-before-edit"
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-ask block-reask-after-free-text-answer"
           }
         ]
       }
@@ -94,6 +127,14 @@
       {
         "type": "command",
         "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-execution-for-declared-step"
+      },
+      {
+        "type": "command",
+        "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-answer-before-edit"
+      },
+      {
+        "type": "command",
+        "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" node \"$(git rev-parse --show-toplevel)/harness/.agents/hooks/antigravity-hook-adapter.mjs\" stop block-reask-after-free-text-answer"
       }
     ]
   }
