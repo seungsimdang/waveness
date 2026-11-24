@@ -21,6 +21,8 @@ const commit = (cwd, ...messages) => git(cwd, "commit", "-q", ...messages.flatMa
 const read = (...parts) => readFileSync(join(...parts), "utf8");
 const run = (hub, ...args) =>
   spawnSync("node", [join(hub, "bin/harness.mjs"), ...args], { env: ENV }).stdout.toString();
+const execHarness = (hub, args, extraEnv = {}) =>
+  spawnSync("node", [join(hub, "bin/harness.mjs"), ...args], { env: { ...ENV, ...extraEnv }, encoding: "utf8" });
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "harness-test-"));
@@ -192,7 +194,7 @@ test("받기는 기존 lock 파일의 탭 들여쓰기를 보존", () => {
     writeFileSync(join(hub, "harness/CLAUDE.md"), "탭 보존 확인\n");
     git(hub, "add", ".");
     commit(hub, "docs: 범용");
-    run(hub, "pull", project);
+    run(hub, "pull", project, "--no-commit");
     assert.match(readFileSync(lockFile, "utf8"), /\n\t"synced": "[0-9a-f]{40}"/);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -308,7 +310,7 @@ test("자동 PR 받기는 기존 모델·effort를 반복 업데이트에서도 
       writeFileSync(join(hub, "harness", agy), agyAgent("inherit", "gemini-4-hydrogen-high", body));
       git(hub, "add", "."); commit(hub, "test: 공용 변경");
       const result = spawnSync(process.execPath, [join(hub, "bin/harness.mjs"), "pull", project], {
-        env: { ...ENV, HARNESS_PRESERVE_PROJECT_MODELS: "1" }, encoding: "utf8",
+        env: { ...ENV, HARNESS_PRESERVE_PROJECT_MODELS: "1", HARNESS_PREPARE_ONLY: "1" }, encoding: "utf8",
       });
       assert.equal(result.status, 0, result.stderr);
       assert.equal(read(project, codex), role("project-model", "medium", body));
@@ -609,6 +611,150 @@ test("공용 회귀 검사와 검사기는 기존 경로 설정으로 허브 사
     for (const file of ["biome-check.mjs", "editor/extension.cjs"])
       assert.equal(read(up, `harness/.harness/${file}`), read(hub, `harness/.harness/${file}`));
     assert.equal(sync(), "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("수동 받기와 receive는 통합 브랜치가 아니면 차단하고 --allow-branch로만 허용", () => {
+  const { root, hub, project } = setup();
+  try {
+    run(hub, "pull", project);
+    git(project, "add", "-A");
+    commit(project, "chore: 하네스 연결", "Harness-Scope: sync");
+    writeFileSync(join(hub, "harness/CLAUDE.md"), "허브 갱신\n");
+    git(hub, "add", ".");
+    commit(hub, "docs: 갱신");
+
+    // feature 브랜치에서는 pull과 receive 모두 차단되며 파일을 건드리지 않음
+    git(project, "checkout", "-q", "-b", "feat/work");
+    const pullBlocked = execHarness(hub, ["pull", project]);
+    assert.equal(pullBlocked.status, 1);
+    assert.match(pullBlocked.stderr, /통합 브랜치\(develop\)가 아닙니다/);
+    assert.equal(git(project, "status", "--porcelain"), "");
+
+    const receiveBlocked = execHarness(hub, ["receive", project]);
+    assert.equal(receiveBlocked.status, 1);
+    assert.match(receiveBlocked.stdout, /받기 중단: 현재 브랜치\(feat\/work\)가 통합 브랜치\(develop\)가 아닙니다/);
+
+    // 허브 projects.json에 develop이 등록되어 있으면 main 브랜치에서도 차단함
+    git(project, "remote", "add", "origin", "https://github.com/SOLlink-Industrial/app.git");
+    mkdirSync(join(hub, ".harness"), { recursive: true });
+    writeFileSync(join(hub, ".harness/projects.json"), JSON.stringify({ projects: [{ repo: "SOLlink-Industrial/app", branch: "develop" }] }));
+    git(project, "checkout", "-q", "-b", "main", "develop");
+    const mainBlocked = execHarness(hub, ["pull", project]);
+    assert.equal(mainBlocked.status, 1);
+    assert.match(mainBlocked.stderr, /통합 브랜치\(develop\)가 아닙니다/);
+
+    // --allow-branch --no-commit으로 격리 작업 예외 허용
+    const allowed = execHarness(hub, ["pull", project, "--allow-branch", "--no-commit"]);
+    assert.equal(allowed.status, 0, allowed.stderr);
+    assert.equal(read(project, "CLAUDE.md"), "허브 갱신\n");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("수동 받기는 충돌이 없으면 통합 브랜치에 자동 커밋하고 origin까지 push함", () => {
+  const { root, hub, project } = setup();
+  try {
+    const projectRemote = join(root, "project-remote.git");
+    git(root, "init", "-q", "--bare", "-b", "develop", projectRemote);
+    git(project, "remote", "add", "origin", projectRemote);
+    run(hub, "pull", project);
+    git(project, "add", "-A");
+    commit(project, "chore: 하네스 연결", "Harness-Scope: sync");
+    git(project, "push", "-q", "origin", "develop");
+
+    // 충돌 없는 pull: 자동 커밋 + origin/develop push
+    writeFileSync(join(hub, "harness/CLAUDE.md"), "자동 push 본문\n");
+    git(hub, "add", ".");
+    commit(hub, "docs: 1차");
+    const pulled = execHarness(hub, ["pull", project]);
+    assert.equal(pulled.status, 0, pulled.stderr);
+    assert.match(pulled.stdout, /커밋 완료: develop/);
+    assert.match(pulled.stdout, /원격 push 완료: origin\/develop/);
+    assert.equal(git(project, "status", "--porcelain"), "");
+    assert.match(git(project, "log", "-1", "--format=%B"), /Harness-Scope: sync/);
+    assert.equal(git(root, "--git-dir", projectRemote, "rev-parse", "develop"), git(project, "rev-parse", "HEAD"));
+
+    // --no-push는 로컬 커밋만 만들고 원격에는 올리지 않음
+    writeFileSync(join(hub, "harness/CLAUDE.md"), "로컬 커밋만\n");
+    git(hub, "add", ".");
+    commit(hub, "docs: 2차");
+    const prevRemote = git(root, "--git-dir", projectRemote, "rev-parse", "develop");
+    const localOnly = execHarness(hub, ["pull", project, "--no-push"]);
+    assert.equal(localOnly.status, 0, localOnly.stderr);
+    assert.equal(git(project, "status", "--porcelain"), "");
+    assert.equal(git(root, "--git-dir", projectRemote, "rev-parse", "develop"), prevRemote);
+    assert.notEqual(git(project, "rev-parse", "HEAD"), prevRemote);
+
+    // 충돌이 나면 커밋과 push를 하지 않고 충돌 표시를 남김
+    writeFileSync(join(project, "CLAUDE.md"), "프로젝트 수정\n");
+    git(project, "add", ".");
+    commit(project, "docs: 프로젝트 수정", "Harness-Scope: project");
+    writeFileSync(join(hub, "harness/CLAUDE.md"), "허브 충돌 수정\n");
+    git(hub, "add", ".");
+    commit(hub, "docs: 3차");
+    const headBefore = git(project, "rev-parse", "HEAD");
+    const conflicted = execHarness(hub, ["pull", project]);
+    assert.equal(conflicted.status, 1);
+    assert.match(conflicted.stderr, /충돌 1건/);
+    assert.equal(git(project, "rev-parse", "HEAD"), headBefore);
+    assert.match(read(project, "CLAUDE.md"), /<<<<<<</);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("수동 올리기는 허브가 main일 때만 허용하고 커밋 뒤 origin까지 push함", () => {
+  const { root, hub, project } = setup();
+  try {
+    run(hub, "pull", project);
+    git(project, "add", "-A");
+    commit(project, "chore: 하네스 연결", "Harness-Scope: sync");
+
+    appendFileSync(join(project, "docs/agent-rules/git-safety.md"), "\n첫 범용 개선\n");
+    git(project, "add", ".");
+    commit(project, "docs: 1차 범용", "Harness-Scope: generic");
+
+    // 허브가 main이 아니면 차단됨
+    git(hub, "checkout", "-q", "-b", "feat/hub-work");
+    const blocked = execHarness(hub, ["push", project]);
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stderr, /허브 현재 브랜치\(feat\/hub-work\)가 main이 아닙니다/);
+    git(hub, "checkout", "-q", "main");
+
+    // --no-push에서는 원격에 push하지 않음
+    const remote = join(root, "remote.git");
+    const remoteBefore = git(root, "--git-dir", remote, "rev-parse", "main");
+    const noPush = execHarness(hub, ["push", project, "--no-push"]);
+    assert.equal(noPush.status, 0, noPush.stderr);
+    assert.match(noPush.stdout, /커밋 1개/);
+    assert.equal(git(root, "--git-dir", remote, "rev-parse", "main"), remoteBefore);
+
+    // 기본 push 실행 시 origin/main까지 반영됨
+    appendFileSync(join(project, "docs/agent-rules/git-safety.md"), "\n둘째 범용 개선\n");
+    git(project, "add", ".");
+    commit(project, "docs: 2차 범용", "Harness-Scope: generic");
+    const pushed = execHarness(hub, ["push", project]);
+    assert.equal(pushed.status, 0, pushed.stderr);
+    assert.match(pushed.stdout, /원격 push 완료: origin\/main/);
+    assert.equal(git(root, "--git-dir", remote, "rev-parse", "main"), git(hub, "rev-parse", "HEAD"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("초기 연결 받기는 lock.json이 없으면 비통합 브랜치에서도 워킹 트리만 갱신함", () => {
+  const { root, hub, project } = setup();
+  try {
+    git(project, "checkout", "-q", "-b", "feat/init-connect");
+    const res = execHarness(hub, ["pull", project]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(read(project, "AGENTS.md"), read(hub, "harness/AGENTS.md"));
+    assert.ok(existsSync(join(project, ".harness/lock.json")));
+    assert.notEqual(git(project, "status", "--porcelain"), "");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

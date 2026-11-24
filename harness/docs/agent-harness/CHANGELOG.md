@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-11-24 feat(harness): 수동 동기화의 통합 브랜치 가드와 자동 커밋·push 추가
+
+> - `bin/harness.mjs`의 연결 프로젝트 `pull`·`receive`가 통합 브랜치 여부를 확인해 비통합 브랜치 실행을 차단하고, 충돌이 없으면 자동 `Harness-Scope: sync` 커밋 및 `origin` push까지 수행하도록 개선
+> - `bin/harness.mjs`의 수동 `push`도 허브가 `main`일 때만 허용하고 커밋 뒤 `origin/main`까지 push하도록 개선(`--allow-branch`·`--no-commit`·`--no-push` 옵션 및 서버 자동화용 `HARNESS_PREPARE_ONLY=1` 유지)
+
 ## 2026-11-20 chore(harness): harness_edit_approval.py 양방향 동기화 편입 및 LLM 판정기 통일
 
 > - `.harness/upstream-paths` 및 `bin/harness.test.mjs`에 `.harness/harness_edit_approval.py`를 추가해 `seungness`와 양방향 동기화하도록 전환

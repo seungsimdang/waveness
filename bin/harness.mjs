@@ -1,6 +1,7 @@
 // 공용 하네스(harness/)와 프로젝트 하네스를 3-way 병합으로 주고받는 도구
-// pull <프로젝트>: lock 커밋..HEAD 변경을 병합하고 lock 갱신. 충돌 표시를 남기며 커밋은 사람이 함
-// push <프로젝트>: 통합 브랜치의 `Harness-Scope: generic` 커밋을 waveness 현재 브랜치에 커밋별로 반영
+// pull <프로젝트>: 통합 브랜치 확인 후 3-way 병합(연결된 프로젝트는 자동 커밋·push)
+// push <프로젝트>: 통합 브랜치의 `Harness-Scope: generic` 커밋을 waveness main에 커밋 후 push
+// receive <프로젝트>: SessionStart/격리 수신용(커밋·push, 충돌 시 되돌림)
 // auto <프로젝트>: 이전 훅과 호환되는 읽기 전용 상태 안내
 // prepare-upstream: 격리 체크아웃의 허브 간 PR 내용 준비, 원격 변경 없음
 import { execFileSync, spawnSync } from "node:child_process";
@@ -156,10 +157,53 @@ function readLock(project) {
   return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
 }
 
-// 통합 브랜치: lock에 적힌 값, 없으면 develop·main·master 중 먼저 있는 것
+// 통합 브랜치: lock.branch → 허브 projects.json 등록 브랜치 → develop·main·master 중 먼저 있는 것
+function resolveIntegrationBranch(project, lock) {
+  if (lock?.branch) return lock.branch;
+  const projectsFile = join(HUB, ".harness/projects.json");
+  if (existsSync(projectsFile) && gitOk(project, "remote", "get-url", "origin")) {
+    const url = gitText(project, "remote", "get-url", "origin");
+    const match = url.match(/(?:github\.com[/:]|github-[\w-]+:)([\w.-]+\/[\w.-]+?)(?:\.git)?$/);
+    if (match) {
+      const config = JSON.parse(readFileSync(projectsFile, "utf8"));
+      const registered = config.projects?.find((entry) => entry.repo === match[1]);
+      if (registered?.branch) return registered.branch;
+    }
+  }
+  return ["develop", "main", "master"].find((name) =>
+    gitOk(project, "rev-parse", "-q", "--verify", `refs/heads/${name}`),
+  );
+}
+
 function integrationBranch(project, lock) {
-  const candidates = lock.branch ? [lock.branch] : ["develop", "main", "master"];
-  return candidates.find((name) => gitOk(project, "rev-parse", "-q", "--verify", `refs/heads/${name}`));
+  const branch = resolveIntegrationBranch(project, lock);
+  return branch && gitOk(project, "rev-parse", "-q", "--verify", `refs/heads/${branch}`) ? branch : undefined;
+}
+
+function checkProjectBranch(project, lock, allowBranch) {
+  if (!lock || allowBranch) return null;
+  const current = gitText(project, "branch", "--show-current");
+  const expected = resolveIntegrationBranch(project, lock);
+  if (!current || (expected && current !== expected)) {
+    const target = expected ?? "통합 브랜치";
+    return `받기 중단: 현재 브랜치(${current || "detached HEAD"})가 통합 브랜치(${target})가 아닙니다. ${target}로 전환한 뒤 실행하거나 격리 PR 작업 시 --allow-branch를 지정하세요.`;
+  }
+  return null;
+}
+
+function pushBranch(repoDir, branch, label) {
+  if (!gitOk(repoDir, "remote", "get-url", "origin")) return { pushed: false, skipped: "origin 원격 없음" };
+  const pushed = spawnSync("git", ["push", "origin", `HEAD:refs/heads/${branch}`], {
+    cwd: repoDir, encoding: "utf8",
+  });
+  if (pushed.status !== 0) {
+    const detail = (pushed.stderr || pushed.stdout || "").trim().split("\n").slice(-3).join(" / ");
+    return {
+      pushed: false,
+      error: `${label} push 실패(원격이 앞섰으면 git pull --rebase 후 다시 시도): ${detail}`,
+    };
+  }
+  return { pushed: true };
 }
 
 function planPull(project) {
@@ -202,19 +246,82 @@ function finishPull(project, lock, head, steps) {
   return touched;
 }
 
-function pull(project) {
+function pull(project, opts = {}) {
+  const existingLock = readLock(project);
+  const prepareOnly = process.env.HARNESS_PREPARE_ONLY === "1";
+  const shouldCommit = Boolean(existingLock) && !opts.noCommit && !prepareOnly;
+  const shouldPush = shouldCommit && !opts.noPush;
+  const branchError = checkProjectBranch(project, existingLock, opts.allowBranch);
+  if (branchError) {
+    console.error(branchError);
+    process.exitCode = 1;
+    return;
+  }
+  if (shouldCommit) {
+    if (!gitOk(project, "diff", "--cached", "--quiet")) {
+      console.error("받기 중단: 스테이징된 변경이 있습니다. 정리한 뒤 다시 실행하세요.");
+      process.exitCode = 1;
+      return;
+    }
+    const synced = syncPaths(project);
+    const dirty = lines(gitText(project, "status", "--porcelain", "--no-renames"))
+      .map((line) => line.slice(3))
+      .filter(synced);
+    if (dirty.length) {
+      console.error(`받기 중단: 하네스 파일에 커밋하지 않은 변경이 있음 (${dirty.slice(0, 3).join(", ")})`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   const { lock, head, steps } = planPull(project);
-  finishPull(project, lock, head, steps);
+  if (shouldCommit && lock.synced === head) {
+    console.log(`받기: 이미 최신 상태 (${head.slice(0, 7)})`);
+    return;
+  }
+  const touched = finishPull(project, lock, head, steps);
   console.log(`받기: ${(lock.synced ?? "처음").slice(0, 7)}..${head.slice(0, 7)}, 파일 ${steps.length}개`);
   const conflicts = conflictsOf(steps, project);
   if (conflicts.length) {
     console.error(`충돌 ${conflicts.length}건. 표시를 정리한 뒤 Harness-Scope: sync로 커밋하세요:\n${conflicts.join("\n")}`);
     process.exitCode = 1;
+    return;
+  }
+  if (!shouldCommit) return;
+  git(project, "add", "-A", "--", ...touched);
+  if (gitOk(project, "diff", "--cached", "--quiet")) return;
+  const commit = spawnSync("git", [
+    "commit", "-q", "-m", "chore(harness): 공용 하네스 동기화",
+    "-m", `- waveness ${head.slice(0, 7)} 반영(파일 ${steps.length}개)`,
+    "-m", "Harness-Sync: 공용 하네스 동기화\nHarness-Scope: sync",
+  ], { cwd: project });
+  if (commit.status !== 0) {
+    git(project, "restore", "--staged", "--worktree", "--source=HEAD", "--", ...touched);
+    console.error(`받기 커밋 실패(변경은 되돌림): ${commit.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`);
+    process.exitCode = 1;
+    return;
+  }
+  const currentBranch = gitText(project, "branch", "--show-current");
+  console.log(`커밋 완료: ${currentBranch} (${gitText(project, "rev-parse", "--short", "HEAD")})`);
+  if (shouldPush) {
+    const res = pushBranch(project, currentBranch, "받기");
+    if (res.pushed) console.log(`원격 push 완료: origin/${currentBranch}`);
+    else if (res.error) {
+      console.error(res.error);
+      process.exitCode = 1;
+    } else if (res.skipped) console.log(`원격 push 건너뜀: ${res.skipped}`);
   }
 }
 
 // 통합 브랜치의 미반영 generic 커밋을 waveness에 커밋. 충돌이면 그 커밋에서 멈추고 사유를 돌려줌
-function push(project, { manual }) {
+function push(project, { manual, allowBranch = false, noPush = false }) {
+  const prepareOnly = process.env.HARNESS_PREPARE_ONLY === "1";
+  const hubBranch = gitText(HUB, "branch", "--show-current");
+  if (manual && !allowBranch && !prepareOnly && hubBranch !== "main") {
+    return {
+      made: 0,
+      stopped: `올리기 중단: 허브 현재 브랜치(${hubBranch || "detached HEAD"})가 main이 아닙니다. main으로 전환하거나 --allow-branch를 지정하세요.`,
+    };
+  }
   const lock = readLock(project);
   if (!lock) throw new Error("연결되지 않은 프로젝트(.harness/lock.json 없음)");
   const branch = integrationBranch(project, lock);
@@ -278,6 +385,11 @@ function push(project, { manual }) {
     }
     made++;
   }
+  if (made > 0 && !noPush && !prepareOnly && hubBranch) {
+    const res = pushBranch(HUB, hubBranch, "올리기");
+    if (res.pushed) console.log(`원격 push 완료: origin/${hubBranch}`);
+    else if (res.error) return { made, stopped: res.error };
+  }
   return { made, stopped: null };
 }
 
@@ -294,7 +406,10 @@ function withLock(project, fn) {
   }
 }
 
-function autoPull(project) {
+function autoPull(project, opts = {}) {
+  const existingLock = readLock(project);
+  const branchError = checkProjectBranch(project, existingLock, opts.allowBranch);
+  if (branchError) return branchError;
   if (!gitOk(project, "diff", "--cached", "--quiet")) return "받기 건너뜀: 스테이징된 변경이 있음";
   const synced = syncPaths(project);
   const dirty = lines(gitText(project, "status", "--porcelain", "--no-renames"))
@@ -318,6 +433,12 @@ function autoPull(project) {
     // 스테이징된 채로 두면 다음 받기가 '스테이징된 변경이 있음'으로 계속 건너뛰므로 되돌림
     git(project, "restore", "--staged", "--worktree", "--source=HEAD", "--", ...touched);
     return `받기 커밋 실패(변경은 되돌림, 원인을 고치면 다음 세션 시작 때 다시 받음. 바로 받으려면 node ${HUB}/bin/harness.mjs pull ${project}): ${commit.stderr.toString().trim().split("\n").slice(-3).join(" / ")}`;
+  }
+  const currentBranch = gitText(project, "branch", "--show-current");
+  if (!opts.noPush && process.env.HARNESS_PREPARE_ONLY !== "1" && currentBranch) {
+    const res = pushBranch(project, currentBranch, "받기");
+    if (res.error) return `공용 하네스 받기 커밋 완료, ${res.error}`;
+    if (res.pushed) return `공용 하네스 받기: waveness ${head.slice(0, 7)}, 파일 ${steps.length}개 커밋 및 origin/${currentBranch} push 완료`;
   }
   return `공용 하네스 받기: waveness ${head.slice(0, 7)}, 파일 ${steps.length}개 커밋`;
 }
@@ -529,16 +650,36 @@ function report(notes) {
   else if (notes.length) console.log(notes.join("\n"));
 }
 
-const [command, target, mode = "both"] = process.argv.slice(2);
+function parseCli(argv) {
+  const opts = { allowBranch: false, noCommit: false, noPush: false };
+  const positional = [];
+  for (const arg of argv) {
+    if (arg === "--allow-branch") opts.allowBranch = true;
+    else if (arg === "--no-commit") opts.noCommit = true;
+    else if (arg === "--no-push") opts.noPush = true;
+    else if (arg.startsWith("-")) return { error: `알 수 없는 옵션: ${arg}` };
+    else positional.push(arg);
+  }
+  return { opts, positional };
+}
+
+const USAGE = "사용법: node bin/harness.mjs pull|push|receive <프로젝트 경로> [--allow-branch] [--no-commit] [--no-push] | auto <프로젝트 경로> [pull|push|both] | upstream";
+
+const parsed = parseCli(process.argv.slice(2));
+if (parsed.error) {
+  console.error(`${parsed.error}\n${USAGE}`);
+  process.exit(2);
+}
+const { opts, positional: [command, target, mode = "both"] } = parsed;
 if (command === "prepare-upstream") {
   report(safeUpstream());
   process.exit(0);
 }
-if (command === "receive") {
+if (command === "receive" && target) {
   const project = gitText(resolve(target), "rev-parse", "--show-toplevel");
-  const result = autoPull(project);
+  const result = autoPull(project, opts);
   if (result) console.log(result);
-  process.exit(/보류|실패/.test(result ?? "") ? 1 : 0);
+  process.exit(/중단|보류|실패/.test(result ?? "") ? 1 : 0);
 }
 if (command === "upstream") {
   const result = spawnSync(process.execPath, [join(HUB, "bin/harness-automation.mjs"), "status-hubs"], { encoding: "utf8", env: process.env });
@@ -546,13 +687,13 @@ if (command === "upstream") {
   process.exit(0);
 }
 if (!["pull", "push", "auto"].includes(command) || !target || !["pull", "push", "both"].includes(mode)) {
-  console.error("사용법: node bin/harness.mjs pull|push <프로젝트 경로> | auto <프로젝트 경로> [pull|push|both] | upstream");
+  console.error(USAGE);
   process.exit(2);
 }
 const project = gitText(resolve(target), "rev-parse", "--show-toplevel");
-if (command === "pull") pull(project);
+if (command === "pull") pull(project, opts);
 if (command === "push") {
-  const { made, stopped } = push(project, { manual: true });
+  const { made, stopped } = push(project, { manual: true, allowBranch: opts.allowBranch, noPush: opts.noPush });
   console.log(`올리기: waveness 현재 브랜치에 커밋 ${made}개`);
   if (stopped) {
     console.error(stopped);

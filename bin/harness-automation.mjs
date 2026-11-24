@@ -190,7 +190,7 @@ function clone(repo, branch, path) {
 
 // 준비 중인 프로젝트 코드는 인증 정보 없이 실행, 실제 검사는 PR의 읽기 전용 CI에서 수행
 function prepare(hub, command, project, extra = {}) {
-  const env = { ...process.env, ...extra, ...(command === "pull" && { HARNESS_PRESERVE_PROJECT_MODELS: "1" }) };
+  const env = { ...process.env, ...extra, HARNESS_PREPARE_ONLY: "1", ...(command === "pull" && { HARNESS_PRESERVE_PROJECT_MODELS: "1" }) };
   for (const key of Object.keys(env)) if (/TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key)) delete env[key];
   const result = spawnSync(process.execPath, [join(hub, "bin/harness.mjs"), command, project], {
     cwd: hub, env, encoding: "utf8", maxBuffer: 1 << 24,
