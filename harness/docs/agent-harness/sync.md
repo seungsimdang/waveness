@@ -61,9 +61,11 @@
 ## 수동 동기화
 
 ```bash
-node ../waveness/bin/harness.mjs pull .   # 받기. 충돌 표시를 남기고 커밋은 직접(Harness-Scope: sync)
-node ../waveness/bin/harness.mjs push .   # 올리기. waveness 현재 브랜치에 커밋, push는 직접
+node ../waveness/bin/harness.mjs pull .   # 받기. 통합 브랜치에서만 실행, 충돌 없으면 Harness-Scope: sync 자동 커밋·push
+node ../waveness/bin/harness.mjs push .   # 올리기. waveness main에서만 실행, 커밋 후 origin/main 자동 push
 ```
+
+- 통합 브랜치 외 예외 실행이나 커밋·push 생략이 필요하면 `--allow-branch`, `--no-commit`, `--no-push` 옵션을 사용한다. 충돌이 발생하면 커밋·push를 멈추고 충돌 해소 뒤 `Harness-Scope: sync`로 직접 커밋한다.
 
 ## 문제가 생겼을 때
 
