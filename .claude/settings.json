@@ -99,6 +99,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-source-before-best-practice-edit.sh\""
           }
         ]
       },
@@ -118,6 +122,10 @@
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-answer-before-edit.sh\"",
             "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-blueprint-before-harness-approval.sh\""
           }
         ]
       },
@@ -136,6 +144,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/require-source-before-best-practice-edit.sh\""
           }
         ]
       },
@@ -149,6 +161,10 @@
           {
             "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/block-comment-line-wrap.sh\""
+          },
+          {
+            "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$CLAUDE_PROJECT_DIR/harness\" sh \"$CLAUDE_PROJECT_DIR/harness/.claude/hooks/block-implementer-new-tests.sh\""
           }
         ]
       },

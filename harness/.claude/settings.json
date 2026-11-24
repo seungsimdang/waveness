@@ -99,6 +99,10 @@
 					{
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-source-before-best-practice-edit.sh\""
 					}
 				]
 			},
@@ -118,6 +122,10 @@
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-answer-before-edit.sh\"",
 						"timeout": 90
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-blueprint-before-harness-approval.sh\""
 					}
 				]
 			},
@@ -136,6 +144,10 @@
 					{
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-harness-lab-before-harness-edit.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-source-before-best-practice-edit.sh\""
 					}
 				]
 			},
@@ -153,6 +165,10 @@
 					{
 						"type": "command",
 						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-comment-line-wrap.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-implementer-new-tests.sh\""
 					}
 				]
 			},

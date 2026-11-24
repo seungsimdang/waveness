@@ -73,6 +73,10 @@
 					{
 						"type": "command",
 						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-answer-before-edit.sh\""
+					},
+					{
+						"type": "command",
+						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/require-source-before-best-practice-edit.sh\""
 					}
 				]
 			},
@@ -98,6 +102,14 @@
 					{
 						"type": "command",
 						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" require-answer-before-edit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" block-implementer-new-tests"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/codex-tool-adapter.mjs\" require-source-before-best-practice-edit"
 					}
 				]
 			},
