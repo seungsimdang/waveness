@@ -380,7 +380,7 @@ export function coordinate() {
       clone(target.repo, target.branch, project);
       const lock = json(join(project, ".harness/lock.json"));
       if (lock.branch && lock.branch !== target.branch) throw new Error("등록과 lock의 통합 브랜치 불일치");
-      if (!existsSync(join(project, ".harness/checks.json")))
+      if (existsSync(join(project, "package.json")) && !existsSync(join(project, ".harness/checks.json")))
         throw new Error("공용 커밋 검사 마이그레이션 필요: 프로젝트 검사 설정·훅·paths 검토 후 반영");
       const originalPaths = readFileSync(join(project, ".harness/paths"), "utf8");
       const allowed = (path) => path === VERIFY || path === ".harness/lock.json" ||

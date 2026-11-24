@@ -80,7 +80,7 @@ if approved_change(entries, root, data, targets):
 
 sys.stderr.write(
     "하네스 파일(" + ", ".join(sorted(set(targets))) + ")을 harness-lab 절차 없이 고치려 함. "
-    "harness-lab 청사진의 전체 경로·before_sha256·edit_sha256을 제시하고 그 청사진 이후 사용자 승인을 받아야 합니다.\n"
+    "harness-lab 청사진의 전체 경로·before_sha256·edit_sha256을 본문 <harness-plan> 블록이나 계획 파일 참조 <harness-plan-file path=\"절대경로\" sha256=\"파일 해시\"/>로 제시하고 그 청사진 이후 사용자 승인을 받아야 합니다.\n"
 )
 sys.exit(2)
 '

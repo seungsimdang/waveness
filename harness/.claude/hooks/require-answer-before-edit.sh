@@ -3,7 +3,9 @@
 # "확인하고 다시 답변해"처럼 앞서 한 답을 다시 요구하는 지시도 답해야 할 질문으로 보고, "~하고 보고해"처럼 작업 뒤 결과 보고를 요구하는 지시는 질문으로 보지 않음
 # 질문 응답 여부 판정은 이 훅만 맡음. judge-unverified-claims.sh는 답의 내용(근거, 원인)만 판정함
 # Stop은 사용자 중단 시 실행되지 않아(Claude Code hooks 문서 Stop 절) 턴 끝 판정만으로는 부족함
-# 질문은 transcript의 이번 턴 사용자 메시지(턴 시작, 작업 중 메시지, 질문 창 직접 입력)에서 모으고, 의문형 후보가 없으면 판정기를 부르지 않음
+# 질문은 transcript의 이번 턴 사용자 메시지(턴 시작, 작업 중 메시지)에서 모으고, 의문형 후보가 없으면 판정기를 부르지 않음
+# 질문 창 직접 입력 질문은 판정하지 않음
+# Claude는 block-reask-after-free-text-answer.sh가 맡음
 # 의문형 후보에 걸린 사용자 메시지만 판정기에 전달함
 # 작업 알림은 자동 입력으로 분류해 제외함
 # 끝만 넘기면 긴 턴 앞부분에서 한 답이 잘려 오판하므로 응답 텍스트는 앞과 끝을 함께 넘김
@@ -109,15 +111,6 @@ for entry in entries[start + 1:]:
     attachment = entry.get("attachment") or {}
     if attachment.get("type") == "queued_command" and attachment.get("prompt"):
         prompts.append(user_text(str(attachment["prompt"])))
-    # 질문 창 직접 입력은 tool_result로 남으므로 선택지 라벨이 아닌 답만 질문 후보에 넣음
-    tool_result = entry.get("toolUseResult")
-    if isinstance(tool_result, dict) and isinstance(tool_result.get("answers"), dict):
-        for question in tool_result.get("questions") or []:
-            labels = {option.get("label") for option in question.get("options") or []}
-            value = tool_result["answers"].get(question.get("question"))
-            parts = value.split(", ") if value and question.get("multiSelect") else [value]
-            if value and not set(parts) <= labels:
-                prompts.append(str(value))
     if entry.get("type") == "assistant":
         for c in (entry.get("message") or {}).get("content") or []:
             if isinstance(c, dict) and c.get("type") == "text":
@@ -164,7 +157,7 @@ turn_text = turn_text or "(없음)"
 asking = data.get("tool_name") == "AskUserQuestion"
 action = "질문 창을 띄우" if asking else "파일을 고치"
 moment = f"{action}려는 지금까지" if event == "PreToolUse" else "턴을 끝내는 지금까지"
-judge_prompt = f"""[사용자 메시지](턴 시작 메시지, 작업 중에 보낸 메시지, 질문 창 직접 입력, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [이번 턴 응답 텍스트] 어디에서도 답하지 않은 것이 있는지 판정하고 JSON 한 줄만 출력한다.
+judge_prompt = f"""[사용자 메시지](턴 시작 메시지, 작업 중에 보낸 메시지, ---로 구분)의 질문(붙여 넣은 내용 뒤에 단 질문 포함) 중 [이번 턴 응답 텍스트] 어디에서도 답하지 않은 것이 있는지 판정하고 JSON 한 줄만 출력한다.
 기준 시점은 {moment}다. 작업 지시는 질문이 아니다. 단 "확인하고 다시 답변해", "다시 대답해"처럼 앞서 한 답을 다시 요구하는 지시는 답해야 할 질문으로 보고, 원문을 그대로 unanswered에 쓴다. "~하고 보고해", "검토 후 보고해"처럼 작업을 먼저 하고 끝에 결과를 보고하라는 지시는 질문이 아니다. 이전 답변을 인용만 한 문장, 결정 선택지에 대한 답, 질문 없이 내용만 전달한 메시지도 질문이 아니다. 답의 정확성은 판정하지 않는다. 확신이 없으면 통과시킨다.
 출력: {{"unanswered": "<답하지 않은 질문 원문>"}} 또는 모두 답했거나 질문이 없으면 {{"unanswered": null}}.
 
