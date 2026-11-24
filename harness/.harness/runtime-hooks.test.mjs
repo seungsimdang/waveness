@@ -900,6 +900,65 @@ for (const tool of ['.claude', '.codex']) {
 			rmSync(marks, { recursive: true, force: true });
 		}
 	});
+
+	test(`${tool} 판정 훅이 작업 중 보낸 질문 뒤의 첫 응답을 판정 대상으로 본다`, () => {
+		const marks = mkdtempSync(join(tmpdir(), 'portfolio-feasibility-queued-'));
+		const judgeBin = join(marks, 'judge.sh');
+
+		writeFileSync(judgeBin, `#!/bin/sh\ncat >/dev/null\necho '{"ask": true, "split": false}'\n`);
+		chmodSync(judgeBin, 0o755);
+
+		const confirm = '하네스 커밋은 규칙상 기능 브랜치에서 만들어졌습니다?';
+		const text = (type, value) => ({ type, message: { content: [{ type: 'text', text: value }] } });
+
+		// 작업 중 메시지는 user 항목이 아니라 queued_command 첨부로 기록됨
+		const queued = prompt => ({
+			type: 'attachment',
+			attachment: { type: 'queued_command', prompt, origin: { kind: 'human' } }
+		});
+
+		try {
+			const answer = (queuedPrompt, reply) => {
+				const transcript = join(marks, 'transcript.jsonl');
+
+				const entries = [
+					text('user', '하네스 커밋이 왜 여기 있어'),
+					text('assistant', '커밋이 이 브랜치에 쌓인 이유는 두 가지입니다.'),
+					queued(queuedPrompt),
+					text('assistant', reply)
+				];
+
+				writeFileSync(transcript, entries.map(entry => JSON.stringify(entry)).join('\n'));
+
+				const hook = input =>
+					spawnSync('sh', [resolve(H, tool, 'hooks', 'require-feasibility-verdict.sh')], {
+						input: JSON.stringify({ session_id: 's1', transcript_path: transcript, ...input }),
+						encoding: 'utf8',
+						cwd: H,
+						env: { ...env, TMPDIR: marks, STOP_JUDGE_BIN: judgeBin }
+					});
+
+				hook({ hook_event_name: 'UserPromptSubmit', prompt: confirm });
+
+				const { stdout } = hook({ hook_event_name: 'Stop', last_assistant_message: reply });
+
+				hook({ hook_event_name: 'Stop', last_assistant_message: reply, stop_hook_active: true });
+
+				return stdout;
+			};
+
+			assert.equal(answer(confirm, '아니요. 규칙 때문이 아닙니다.'), '');
+			assert.equal(JSON.parse(answer(confirm, '경위를 설명드리겠습니다.')).decision, 'block');
+			assert.equal(
+				JSON.parse(
+					answer(`<agent-message>${confirm}</agent-message>`, '아니요. 규칙 때문이 아닙니다.')
+				).decision,
+				'block'
+			);
+		} finally {
+			rmSync(marks, { recursive: true, force: true });
+		}
+	});
 }
 
 test('.claude 판정 훅이 확인 미룸을 한 번 막고 질문 창 직접 입력을 판정 대상에 넣는다', () => {

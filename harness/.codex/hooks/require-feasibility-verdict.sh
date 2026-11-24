@@ -133,6 +133,13 @@ except Exception:
 for entry in entries:
     if not isinstance(entry, dict) or entry.get("isMeta"):
         continue
+    # 작업 중에 보낸 사용자 메시지는 user 항목이 아니라 queued_command 첨부로 남으므로 같은 턴 경계로 봄
+    attachment = entry.get("attachment") if entry.get("type") == "attachment" else None
+    if isinstance(attachment, dict):
+        queued = str(attachment.get("prompt") or "")
+        if attachment.get("type") == "queued_command" and queued.strip() and not queued.lstrip().startswith("<agent-message"):
+            first_text = None
+        continue
     payload = entry.get("payload") or {}
     role = payload.get("role") or entry.get("type")
     content = payload.get("content") if payload.get("role") else (entry.get("message") or {}).get("content")

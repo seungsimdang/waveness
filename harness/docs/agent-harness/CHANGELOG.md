@@ -1,5 +1,12 @@
 # 하네스 변경 이력
 
+## 2026-11-24 fix(harness): 작업 중 보낸 확인 질문의 판정 훅 오탐 수정
+
+- Harness-Origin: `kcl-monitoring-frontend@42f0db569e023d169922382586ff18e35d8918b0`
+
+> - require-feasibility-verdict.sh가 작업 중 메시지(queued_command 첨부)를 턴 경계로 인정하도록 Claude·Codex판 함께 수정
+> - 작업 중 질문 뒤 첫 응답 판정과 에이전트 보고 제외 회귀 테스트 추가
+
 ## 2026-11-24 feat(harness): 수동 동기화의 통합 브랜치 가드와 자동 커밋·push 추가
 
 > - `bin/harness.mjs`의 연결 프로젝트 `pull`·`receive`가 통합 브랜치 여부를 확인해 비통합 브랜치 실행을 차단하고, 충돌이 없으면 자동 `Harness-Scope: sync` 커밋 및 `origin` push까지 수행하도록 개선
