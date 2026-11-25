@@ -152,10 +152,15 @@ for (const tool of ['.claude', '.codex']) {
 		assert.equal(lint('git commit -m "a"'), 0);
 		writeFileSync(join(repo, 'b.ts'), 'WARN\n');
 		assert.equal(lint('git add . && git commit -m "a"'), 2);
+		assert.equal(lint('git commit -am "a"'), 2);
+		assert.equal(lint('git commit -m "a"'), 0);
 		assert.equal(lint('git status'), 0);
 		assert.equal(lint('echo "git commit"'), 0);
+		git('add', 'b.ts');
+		assert.equal(lint('git commit -m "a"'), 2);
 		assert.equal(lint(`cd ${repo} && git commit -m "a"`, marks), 2);
 		assert.equal(lint(`git -C ${repo} commit -m "a"`, marks), 2);
+		assert.equal(lint('git commit --amend -m "a"'), 2);
 		writeFileSync(join(repo, 'b.ts'), 'ok\n');
 		mkdirSync(join(repo, '.harness'));
 		writeFileSync(
@@ -2278,7 +2283,7 @@ test('Codex 재질문 훅이 request_user_input_async 직접 입력 질문 뒤 �
 test('판정기 명령은 런타임별 하나로 정하고 effort는 모두 medium', () => {
 	const pick = (script, transcript = '', runtime = '') =>
 		JSON.parse(
-			spawnSync('python3', ['-c', `import json,sys; sys.path.insert(0, ${JSON.stringify(resolve(H, '.harness'))}); from judge_command import judge_command, runtime; k = runtime(sys.argv[1], sys.argv[2]); print(json.dumps([k, judge_command(k, "P", "/o")[0]]))`, script, transcript], {
+			spawnSync('python3', ['-B', '-c', `import json,sys; sys.path.insert(0, ${JSON.stringify(resolve(H, '.harness'))}); from judge_command import judge_command, runtime; k = runtime(sys.argv[1], sys.argv[2]); print(json.dumps([k, judge_command(k, "P", "/o")[0]]))`, script, transcript], {
 				encoding: 'utf8',
 				env: { ...env, STOP_JUDGE_BIN: '', HARNESS_RUNTIME: runtime }
 			}).stdout

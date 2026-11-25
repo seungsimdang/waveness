@@ -27,6 +27,7 @@
 .harness/antigravity-hooks.test.mjs
 .harness/runtime-hooks.test.mjs
 .harness/harness_edit_approval.py
+.harness/judge_command.py
 .harness/deferred-claims-pattern.txt
 .harness/deferred-claims-exempt-pattern.txt
 .harness/check-ephemeral-comment-refs.sh

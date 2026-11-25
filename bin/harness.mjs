@@ -458,17 +458,57 @@ function tree(repo, rev, include) {
 const repoReady = (repo) =>
   gitText(repo, "branch", "--show-current") === "main" && !gitText(repo, "status", "--porcelain");
 
-const HOOK_CONFIGS = [".claude/settings.json", ".codex/hooks.json"];
+const HOOK_CONFIGS = [".claude/settings.json", ".codex/hooks.json", ".agents/hooks.json"];
+const FLAT_AGY_EVENTS = new Set(["SessionStart", "PreInvocation", "PostInvocation", "Stop"]);
 
-// 등록 명령이 가리키는 훅 스크립트 경로. Codex 어댑터 경유 명령은 실제 스크립트 경로로 바꿈
+// 등록 명령이 가리키는 훅 스크립트 경로. Codex·Antigravity 어댑터 경유 명령은 실제 스크립트 경로로 바꿈
 const hookPaths = (command = "") => [
   ...[...command.matchAll(/\.(?:claude|codex)\/hooks\/[\w.-]+\.(?:sh|mjs)/g)].map(([path]) => path),
   ...[...command.matchAll(/codex-tool-adapter\.mjs"?\s+([\w-]+)/g)].map(([, name]) => `.codex/hooks/${name}.sh`),
+  ...[...command.matchAll(/antigravity-hook-adapter\.mjs"?\s+[\w-]+\s+([\w-]+)/g)].map(([, name]) =>
+    name === "sync" ? ".harness/sync.sh" : `.claude/hooks/${name}.sh`,
+  ),
   // hooks 폴더 밖 스크립트(.harness/*.py 등)도 공유 판정 대상, 경로를 못 뽑은 등록이 공유로 분류되지 않게 함
   ...[...command.matchAll(/\.harness\/[\w.-]+/g)].map(([path]) => path),
 ];
 
 const registrationKey = (event, matcher, hook) => JSON.stringify([event, matcher ?? null, hook]);
+
+function normalizeHooksMap(path, config) {
+  if (path !== ".agents/hooks.json") return config?.hooks ?? {};
+  const map = {};
+  for (const [ns, spec] of Object.entries(config ?? {}))
+    for (const [event, value] of Object.entries(spec ?? {}))
+      if (Array.isArray(value))
+        map[`${ns}:${event}`] = FLAT_AGY_EVENTS.has(event) ? [{ hooks: value }] : value;
+  return map;
+}
+
+function applyHooksMap(path, config, hooksMap) {
+  if (path !== ".agents/hooks.json") return { ...config, hooks: hooksMap };
+  const next = {};
+  for (const [ns, spec] of Object.entries(config)) {
+    const out = {};
+    for (const [key, value] of Object.entries(spec ?? {})) {
+      if (!Array.isArray(value)) {
+        out[key] = value;
+        continue;
+      }
+      const groups = hooksMap[`${ns}:${key}`];
+      if (!groups?.length) continue;
+      out[key] = FLAT_AGY_EVENTS.has(key) ? groups.flatMap((group) => group.hooks ?? []) : groups;
+    }
+    for (const [compound, groups] of Object.entries(hooksMap)) {
+      const prefix = `${ns}:`;
+      if (!compound.startsWith(prefix)) continue;
+      const event = compound.slice(prefix.length);
+      if (event in out || !groups?.length) continue;
+      out[event] = FLAT_AGY_EVENTS.has(event) ? groups.flatMap((group) => group.hooks ?? []) : groups;
+    }
+    next[ns] = out;
+  }
+  return next;
+}
 
 // hooks 객체를 등록 항목(이벤트·matcher·훅 정의) 맵으로 펼침
 function registrations(hooks = {}) {
@@ -510,7 +550,8 @@ function rebuildHooks(hooks, shared, isShared) {
 // waveness 전용 훅(upstream-paths 제외)을 가리키는 등록은 공유 대상에서 뺌
 function planHookConfigs(up, synced, head, include) {
   const isShared = (hook) => hookPaths(hook.command).every(include);
-  const shared = (config) => new Map([...registrations(config?.hooks)].filter(([, { hook }]) => isShared(hook)));
+  const shared = (path, config) =>
+    new Map([...registrations(normalizeHooksMap(path, config))].filter(([, { hook }]) => isShared(hook)));
   const steps = { toHub: [], toUp: [] };
   for (const path of HOOK_CONFIGS) {
     const read = (repo, rev) => {
@@ -522,14 +563,15 @@ function planHookConfigs(up, synced, head, include) {
     const ours = read(HUB, "HEAD");
     const theirs = read(up, head);
     if (!ours || !theirs) continue;
-    const base = shared(read(up, synced));
-    const fromUp = shared(theirs);
-    const fromHub = shared(ours);
+    const base = shared(path, read(up, synced));
+    const fromUp = shared(path, theirs);
+    const fromHub = shared(path, ours);
     const merged = new Map([...fromUp, ...fromHub].filter(([key]) => !base.has(key) || (fromUp.has(key) && fromHub.has(key))));
     for (const [repo, config, list] of [[HUB, ours, steps.toHub], [up, theirs, steps.toUp]]) {
-      const hooks = rebuildHooks(config.hooks ?? {}, merged, isShared);
-      if (JSON.stringify(hooks) === JSON.stringify(config.hooks ?? {})) continue;
-      const data = Buffer.from(`${JSON.stringify({ ...config, hooks }, null, indent(repo))}\n`);
+      const currentMap = normalizeHooksMap(path, config);
+      const hooksMap = rebuildHooks(currentMap, merged, isShared);
+      if (JSON.stringify(hooksMap) === JSON.stringify(currentMap)) continue;
+      const data = Buffer.from(`${JSON.stringify(applyHooksMap(path, config, hooksMap), null, indent(repo))}\n`);
       list.push({ file: join(repo, PREFIX, path), entry: { mode: "100644", data } });
     }
   }

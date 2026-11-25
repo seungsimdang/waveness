@@ -133,7 +133,7 @@ export function checkPlan(root) {
 
 export function runChecks(root, { ci = false, base, execute = command } = {}) {
 	const plan = checkPlan(root);
-	const plainEnv = { ...process.env };
+	const plainEnv = { ...process.env, PYTHONDONTWRITEBYTECODE: '1' };
 
 	for (const key of Object.keys(plainEnv)) if (key.startsWith('GIT_')) delete plainEnv[key];
 
@@ -186,7 +186,7 @@ export function runChecks(root, { ci = false, base, execute = command } = {}) {
 
 	let temp;
 	let head;
-	const env = { ...process.env };
+	const env = { ...process.env, PYTHONDONTWRITEBYTECODE: '1' };
 
 	try {
 		if (ci && !plan.hub) {
