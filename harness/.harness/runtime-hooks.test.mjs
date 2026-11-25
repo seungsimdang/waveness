@@ -1559,10 +1559,12 @@ for (const tool of ['.claude', '.codex']) {
 
 			for (const exempt of [
 				'확인하지 않은 이유는 주석 한 줄을 결론으로 받아들였기 때문입니다.',
-				'그래서 피그마대로가 어떤 화면을 뜻하는지 확정할 수 없습니다.'
+				'그래서 피그마대로가 어떤 화면을 뜻하는지 확정할 수 없습니다.',
+				'아니요, 처음에는 레퍼런스를 확인하지 않았습니다.'
 			]) {
 				assert.equal(stop(exempt), '');
 			}
+			assert.equal(JSON.parse(stop('레퍼런스는 확인하지 않았습니다.')).decision, 'block');
 		});
 	});
 }

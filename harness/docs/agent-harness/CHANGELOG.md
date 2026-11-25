@@ -1,5 +1,11 @@
 # 하네스 변경 이력
 
+## 2026-11-25 fix(harness): 확인 미룸 정규식 판정에서 지난 시점 인정 문장 제외
+
+> - `.harness/deferred-claims-exempt-pattern.txt`에 지난 시점(처음·그때·당시·앞선 답변·이전 답변)을 밝히고 확인·검증·측정하지 않았다고 인정한 문장 예외 추가. "아니요, 처음에는 확인하지 않았습니다." 뒤에 같은 응답에서 확인 결과를 보고해도 막히던 오탐 수정
+> - 정규식 단계만 건너뛰며 LLM 판정기의 확인 미룸 규칙은 그대로 적용, 시점 없는 "확인하지 않았습니다"는 계속 차단
+> - Claude `judge-unverified-claims`와 Codex·Antigravity `block-unverified-claims`가 같은 예외 파일을 읽어 함께 적용, 회귀 테스트 추가
+
 ## 2026-11-24 feat(harness): 질문 훅 3종 Antigravity·Codex판 추가 및 LLM 판정기 런타임별 통일
 
 > - `.harness/judge_command.py` 추가: 판정기를 런타임별 하나로 고정(Claude haiku, Codex gpt-6-luna, Antigravity gemini-4-hydrogen-medium, effort 모두 medium), `harness_edit_approval.py`의 claude→codex→agy 폴백 제거
