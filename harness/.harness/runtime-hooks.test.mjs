@@ -2132,8 +2132,8 @@ for (const tool of ['.claude', '.codex']) {
 			assert.equal(
 				check('frontend-developer', 'Edit', {
 					file_path: 'tests/e2e/a.spec.ts',
-					old_string: 'for (const w of [1440, 390]) test(`x ${w}`, f);',
-					new_string: 'for (const w of [1440]) test(`x ${w}`, f);'
+					old_string: 'for (const w of [1440, 390]) test("x " + w, f);',
+					new_string: 'for (const w of [1440]) test("x " + w, f);'
 				}),
 				0
 			);
