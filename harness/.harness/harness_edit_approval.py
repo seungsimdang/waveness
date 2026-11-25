@@ -9,7 +9,9 @@ from pathlib import Path
 def message(entry):
     if entry.get("isMeta"):
         return None, ""
-    answers = (entry.get("toolUseResult") or {}).get("answers")
+    # 도구 거부·오류 결과는 toolUseResult가 문자열이라 dict일 때만 질문 창 답으로 취급
+    result = entry.get("toolUseResult")
+    answers = result.get("answers") if isinstance(result, dict) else None
     if isinstance(answers, dict):
         return "user", "\n".join(str(value) for value in answers.values())
     entry_type = entry.get("type")

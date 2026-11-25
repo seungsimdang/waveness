@@ -973,7 +973,7 @@ for (const tool of ['.claude', '.codex']) {
 	});
 }
 
-test('.claude 청사진 훅이 harness-lab 흐름에서 본문 청사진 없는 승인 질문 창만 막는다', () => {
+test('.claude 청사진 훅이 harness-lab 흐름에서 화면에 보인 청사진 없는 승인 질문 창만 막는다', () => {
 	withTmp('harness-blueprint-ask-', tmp => {
 		const transcript = join(tmp, 'transcript.jsonl');
 		const skill = { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill: 'harness-lab' } }] } };
@@ -989,31 +989,38 @@ test('.claude 청사진 훅이 harness-lab 흐름에서 본문 청사진 없는 
 		};
 
 		assert.equal(ask([user('훅 수정해'), skill]), 2);
-		assert.equal(ask([user('훅 수정해'), skill, text('<harness-plan>{}</harness-plan>')]), 0);
+		assert.equal(ask([user('훅 수정해'), skill, text('<harness-plan>{}</harness-plan>'), user('ㄱㄱ')]), 0);
+		assert.equal(ask([user('훅 수정해'), skill], '<harness-plan>{}</harness-plan> 이 청사진대로 적용할까요?'), 0);
 		assert.equal(ask([user('훅 수정해'), skill], '어느 범위까지 볼까요?'), 0);
 		assert.equal(ask([user('작업해')]), 0);
 		assert.equal(ask([user('훅 수정해'), skill, user('a'), user('b'), user('c')]), 0);
 		assert.equal(ask([user('훅 수정해'), skill], undefined, { agent_id: 'sub' }), 0);
 
-		// 같은 응답의 본문이 훅 실행 뒤에 기록돼도 다시 읽어 통과시킴
-		writeFileSync(transcript, [user('훅 수정해'), skill].map(entry => JSON.stringify(entry)).join('\n'));
-		const late = spawnSync('sh', ['-c', '(sleep 0.3; printf "\\n%s" "$PLAN" >> "$T") & sh "$HOOK"'], {
-			input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: '승인할까요?' }] }, transcript_path: transcript }),
-			encoding: 'utf8',
-			env: { ...process.env, T: transcript, HOOK: resolve(H, '.claude/hooks/require-blueprint-before-harness-approval.sh'), PLAN: JSON.stringify(text('<harness-plan>{}</harness-plan>')) }
-		});
-		assert.equal(late.status, 0, late.stderr);
+		// 질문 창과 같은 응답의 본문은 진행 요약으로 바뀔 수 있어 화면에 보인 글로 보지 않음
+		assert.equal(ask([user('훅 수정해'), skill, text('<harness-plan>{}</harness-plan>')]), 2);
+		// 도구 호출과 같은 메시지(message.id)의 텍스트도 제외
+		const withTool = (id, value) => [
+			{ type: 'assistant', message: { id, content: [{ type: 'text', text: value }] } },
+			{ type: 'assistant', message: { id, content: [{ type: 'tool_use', name: 'Bash', input: {} }] } },
+			{ type: 'user', message: { content: [{ type: 'tool_result', content: 'ok' }] } }
+		];
+		assert.equal(ask([user('훅 수정해'), skill, ...withTool('m1', '<harness-plan>{}</harness-plan>'), user('ㄱㄱ')]), 2);
 
-		// 본문이 태그를 언급만 하면 청사진으로 보지 않음
-		assert.equal(ask([user('훅 수정해'), skill, text('먼저 <harness-plan> 블록을 씁니다')]), 2);
-		assert.equal(ask([user('훅 수정해'), skill, text(`<harness-plan-file path="/tmp/plan.json" sha256="${'a'.repeat(64)}"/>`)]), 0);
+		// 본문이 태그를 언급만 하거나 없는 계획 파일을 참조하면 청사진으로 보지 않음
+		assert.equal(ask([user('훅 수정해'), skill, text('먼저 <harness-plan> 블록을 씁니다'), user('ㄱㄱ')]), 2);
+		assert.equal(ask([user('훅 수정해'), skill, text(`<harness-plan-file path="/tmp/none-plan.json" sha256="${'a'.repeat(64)}"/> harness/a.sh`), user('ㄱㄱ')]), 2);
 
-		// 질문 창 입력의 계획 파일 참조는 파일 해시가 맞을 때만 본문 기록 전에도 통과
+		// 계획 파일 참조는 해시가 맞고 변경 파일 경로가 화면에 보인 글에 모두 있을 때만 통과
 		const planPath = join(tmp, 'plan.json');
-		writeFileSync(planPath, '{}');
-		const digest = createHash('sha256').update('{}').digest('hex');
-		assert.equal(ask([user('훅 수정해'), skill], `승인할까요? <harness-plan-file path="${planPath}" sha256="${digest}"/>`), 0);
-		assert.equal(ask([user('훅 수정해'), skill], `승인할까요? <harness-plan-file path="${planPath}" sha256="${'0'.repeat(64)}"/>`), 2);
+		const plan = JSON.stringify({ skill: 'harness-lab', root: tmp, changes: [{ before_sha256: { 'harness/a.sh': 'absent', 'harness/b.mjs': 'absent' }, edit_sha256: 'x' }] });
+		writeFileSync(planPath, plan);
+		const ref = `<harness-plan-file path="${planPath}" sha256="${createHash('sha256').update(plan).digest('hex')}"/>`;
+		assert.equal(ask([user('훅 수정해'), skill], `승인할까요? ${ref}`), 2);
+		assert.equal(ask([user('훅 수정해'), skill], `harness/a.sh만 고치는 청사진을 승인할까요? ${ref}`), 2);
+		assert.equal(ask([user('훅 수정해'), skill], `harness/a.sh와 harness/b.mjs를 고치는 청사진을 승인할까요? ${ref}`), 0);
+		assert.equal(ask([user('훅 수정해'), skill, text('변경 파일: harness/a.sh, harness/b.mjs'), user('ㄱㄱ')], `승인할까요? ${ref}`), 0);
+		assert.equal(ask([user('훅 수정해'), skill, ...withTool('m2', '변경 파일: harness/a.sh, harness/b.mjs'), user('ㄱㄱ')], `승인할까요? ${ref}`), 2);
+		assert.equal(ask([user('훅 수정해'), skill], `harness/a.sh와 harness/b.mjs 승인할까요? <harness-plan-file path="${planPath}" sha256="${'0'.repeat(64)}"/>`), 2);
 	});
 });
 
@@ -2007,6 +2014,13 @@ test('코덱스 완료 주장 검사가 실제 JSONL의 최신 사용자 요청�
 		assert.ok(!prompt.includes('OLD-EVIDENCE'));
 		assert.ok(prompt.includes('허브 push나 PR 생성'));
 	});
+});
+
+test('하네스 편집 승인 판정은 문자열 도구 결과를 질문 창 답으로 보지 않고 오류 없이 넘긴다', () => {
+	const script = 'import sys; sys.path.insert(0, sys.argv[1]); from harness_edit_approval import message; print(message({"type": "user", "toolUseResult": "Error: rejected", "message": {"content": "ㄱㄱ"}}))';
+	const run = spawnSync('python3', ['-c', script, resolve(H, '.harness')], { encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } });
+	assert.equal(run.status, 0, run.stderr);
+	assert.equal(run.stdout.trim(), "('user', 'ㄱㄱ')");
 });
 
 test('하네스 편집은 승인된 전체 경로·파일 상태·편집 내용이 일치할 때만 허용', () => {

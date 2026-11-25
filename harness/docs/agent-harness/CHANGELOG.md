@@ -1,5 +1,12 @@
 # 하네스 변경 이력
 
+## 2026-11-25 fix(harness): 청사진 승인 질문에서 사용자가 볼 수 있는 청사진 강제
+
+> - `require-blueprint-before-harness-approval.sh`가 질문 창 문구와 도구 호출이 없는 메시지의 텍스트(뒤에 사용자 항목이 기록된 것)만 화면에 보인 글로 인정. 질문 창과 같은 응답 본문, 도구 호출과 같은 message.id의 텍스트는 진행 요약으로 바뀔 수 있어 제외
+> - 계획 파일 참조 `<harness-plan-file>`는 해시가 맞고 `changes[].before_sha256`의 변경 파일 경로가 화면에 보인 글에 모두 있을 때만 인정. 참조만 넣고 청사진 내용 없이 승인을 묻던 흐름과, 본문 참조를 해시 확인 없이 통과시키던 문제 수정
+> - 차단 안내를 "전문을 도구 호출 없는 마지막 텍스트로 보이고 다음 메시지 뒤 질문"으로 변경, 편집 훅 안내에 계획 파일은 편집 승인용임을 추가
+> - `harness_edit_approval.py`가 문자열 `toolUseResult`에서 AttributeError를 내던 문제 수정, 회귀 테스트 추가
+
 ## 2026-11-25 fix(harness): 메모리 요청 훅이 문자열 도구 결과에서 오류로 통과하던 문제 수정
 
 > - `require-memory-request.sh`가 도구 거부·오류 결과처럼 `toolUseResult`가 문자열인 transcript 항목에 `.get`을 호출해 `AttributeError`로 끝나고(비차단 exit 1) 요청 없는 메모리 쓰기를 막지 못하던 문제 수정
