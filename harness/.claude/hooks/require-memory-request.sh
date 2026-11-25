@@ -70,14 +70,20 @@ try:
 except Exception:
     sys.exit(0)
 
+# 도구 거부·오류 결과는 toolUseResult가 문자열이라 dict일 때만 질문 창 답으로 취급
+def answers_of(entry):
+    result = entry.get("toolUseResult")
+    answers = result.get("answers") if isinstance(result, dict) else None
+    return answers if isinstance(answers, dict) else None
+
 def text_of(entry):
     if entry.get("type") == "attachment":
         attachment = entry.get("attachment") or {}
         return str(attachment.get("prompt") or "") if attachment.get("type") == "queued_command" else ""
     if entry.get("type") != "user" or entry.get("isMeta"):
         return ""
-    answers = (entry.get("toolUseResult") or {}).get("answers")
-    if isinstance(answers, dict):
+    answers = answers_of(entry)
+    if answers is not None:
         return "\n".join(str(value) for value in answers.values())
     content = (entry.get("message") or {}).get("content")
     if isinstance(content, str):
@@ -105,7 +111,7 @@ for entry in reversed(entries):
     if not text or text.startswith(MARKERS):
         continue
     turn.append(text)
-    if entry.get("type") == "user" and not isinstance((entry.get("toolUseResult") or {}).get("answers"), dict):
+    if entry.get("type") == "user" and answers_of(entry) is None:
         break
 allowed = False
 for text in reversed(turn):

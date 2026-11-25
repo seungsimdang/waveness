@@ -1531,6 +1531,25 @@ test('.claude 메모리 훅이 작업 중 메시지 뒤에 묻힌 저장 요청�
 		assert.equal(save(['이것도 오탐임?', '메모리 업데이트해', '그리고 이건 왜 그래?']), 0);
 		assert.equal(save(['메모리 업데이트해', '메모리 저장하지 마']), 2);
 		assert.equal(save(['이것도 오탐임?']), 2);
+
+		// 도구 거부·오류 결과는 toolUseResult가 문자열로 기록됨
+		const rejected = JSON.stringify({ type: 'user', toolUseResult: 'Error: rejected', message: { role: 'user', content: [{ type: 'tool_result', content: 'rejected' }] } });
+		const saveWithRejected = prompt => {
+			writeFileSync(transcript, [JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } }), rejected].join('\n'));
+			return runIn(
+				'.claude',
+				'require-memory-request',
+				{
+					hook_event_name: 'PreToolUse',
+					tool_name: 'Write',
+					tool_input: { file_path: '/home/u/.claude/projects/p/memory/a.md' },
+					transcript_path: transcript
+				},
+				tmp
+			).status;
+		};
+		assert.equal(saveWithRejected('메모리 업데이트해'), 0);
+		assert.equal(saveWithRejected('이것도 오탐임?'), 2);
 	});
 });
 

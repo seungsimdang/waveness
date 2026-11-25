@@ -1,5 +1,10 @@
 # 하네스 변경 이력
 
+## 2026-11-25 fix(harness): 메모리 요청 훅이 문자열 도구 결과에서 오류로 통과하던 문제 수정
+
+> - `require-memory-request.sh`가 도구 거부·오류 결과처럼 `toolUseResult`가 문자열인 transcript 항목에 `.get`을 호출해 `AttributeError`로 끝나고(비차단 exit 1) 요청 없는 메모리 쓰기를 막지 못하던 문제 수정
+> - `answers_of`로 `toolUseResult`·`answers`가 모두 dict일 때만 질문 창 답으로 취급, 회귀 테스트 추가
+
 ## 2026-11-25 fix(harness): 메모리 요청 판정을 이번 턴 전체 메시지로 확대 및 요약 기록 안내 추가
 
 > - `require-memory-request.sh`가 마지막 사용자 메시지 하나만 보던 것을 이번 턴 시작 메시지·작업 중 메시지·질문 창 답 전체로 확대, 요청 뒤에 다른 작업 중 메시지가 와도 요청을 인정하고 더 뒤의 부정 표현은 요청을 취소
