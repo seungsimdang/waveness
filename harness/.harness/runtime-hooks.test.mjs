@@ -250,13 +250,20 @@ for (const tool of ['.claude', '.codex']) {
 			'청사진대로 수정 후 amend하여 커밋/푸시해',
 			'청사진대로 수정하고 마무리',
 			'청사진대로 amend하여 마무리',
-			'청사진대로 커밋/푸시해'
+			'청사진대로 커밋/푸시해',
+			'청사진은 승인.',
+			'오탐이야? 청사진은 승인.'
 		]) {
 			prompt(execution);
 			assert.equal(edit('/repo/src/app/page.tsx'), false);
 		}
 
-		for (const report of ['청사진 보여줘', '수정 후 영향이 어떤지 판단하여 보고해', '커밋/푸시해도 되는지 판단하여 보고해']) {
+		for (const report of [
+			'청사진 보여줘',
+			'수정 후 영향이 어떤지 판단하여 보고해',
+			'커밋/푸시해도 되는지 판단하여 보고해',
+			'승인이 필요한지 판단하여 보고해'
+		]) {
 			prompt(report);
 			assert.equal(edit('/repo/src/app/page.tsx'), true);
 		}
@@ -1490,6 +1497,42 @@ const runIn = (tool, hook, input, tmp) =>
 		cwd: H,
 		env: { ...env, TMPDIR: tmp }
 	});
+
+test('.claude 메모리 훅이 작업 중 메시지 뒤에 묻힌 저장 요청을 인정하고 뒤의 부정 표현을 따른다', () => {
+	withTmp('portfolio-memory-', tmp => {
+		const transcript = join(tmp, 'transcript.jsonl');
+		const save = messages => {
+			writeFileSync(
+				transcript,
+				messages
+					.map((prompt, index) =>
+						JSON.stringify(
+							index === 0
+								? { type: 'user', message: { role: 'user', content: prompt } }
+								: { type: 'attachment', attachment: { type: 'queued_command', prompt } }
+						)
+					)
+					.join('\n')
+			);
+			return runIn(
+				'.claude',
+				'require-memory-request',
+				{
+					hook_event_name: 'PreToolUse',
+					tool_name: 'Write',
+					tool_input: { file_path: '/home/u/.claude/projects/p/memory/a.md' },
+					transcript_path: transcript
+				},
+				tmp
+			).status;
+		};
+
+		assert.equal(save(['메모리 업데이트해', '이것도 오탐임?']), 0);
+		assert.equal(save(['이것도 오탐임?', '메모리 업데이트해', '그리고 이건 왜 그래?']), 0);
+		assert.equal(save(['메모리 업데이트해', '메모리 저장하지 마']), 2);
+		assert.equal(save(['이것도 오탐임?']), 2);
+	});
+});
 
 for (const tool of ['.claude', '.codex']) {
 	test(`${tool} 가능 여부 훅이 검토형 질문을 표시하고 표시된 턴의 도구 결과에 안내를 붙인다`, () => {

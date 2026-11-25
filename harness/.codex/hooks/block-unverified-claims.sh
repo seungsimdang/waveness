@@ -5,7 +5,8 @@
 # Codex 전용 정규식 판정으로, Claude는 같은 목적을 settings.json의 Stop prompt 훅(LLM 판정)으로 처리함
 # Codex hooks는 prompt·agent 핸들러를 실행하지 않아 이 방식을 유지함(https://developers.openai.com/codex/hooks)
 # 자기 행동 이유를 묻는 질문에 원인 없이 경위만 답한 것은 정규식으로 가릴 수 없어, Claude판처럼 CLI로 LLM 판정함(Codex는 codex exec, Antigravity는 agy)
-# 질문은 require-why-explanation.sh가 turn_id별로 저장해 둔 것을 씀. 판정 호출은 --disable hooks와 환경변수로 재귀를 막고, 실패하면 통과시킴
+# 질문은 require-why-explanation.sh가 turn_id별로 저장해 둔 것을 씀
+# 판정 호출은 --disable hooks와 환경변수로 재귀를 막고, 실패하면 통과시킴
 
 [ -n "${HARNESS_STOP_JUDGE:-}" ] && exit 0
 

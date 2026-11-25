@@ -76,6 +76,6 @@ for attempt in range(5):
     if attempt < 4:
         time.sleep(0.5)
 
-sys.stderr.write("harness-lab 흐름에서 청사진 본문 없이 적용·승인을 질문 창으로 물으려 함. 점검 요약·변경 계획·테스트와 <harness-plan> 블록을 응답 본문에 먼저 보인 뒤 질문하세요.\n")
+sys.stderr.write("harness-lab 흐름에서 청사진 본문 없이 적용·승인을 질문 창으로 물으려 함. 점검 요약·변경 계획·테스트와 <harness-plan> 블록을 응답 본문에 먼저 보인 뒤 질문하세요. 도구 호출 앞 본문은 진행 요약으로 바뀌어 기록되지 않을 수 있으니, 청사진은 도구 호출 없이 응답 마지막 텍스트로 쓰고 턴을 끝내거나 질문 창 입력에 <harness-plan-file> 참조를 넣으세요.\n")
 sys.exit(2)
 '

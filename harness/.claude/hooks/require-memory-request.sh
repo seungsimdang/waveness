@@ -1,9 +1,8 @@
 #!/bin/sh
 # PreToolUse(Edit|Write|NotebookEdit, 파일 쓰는 Bash) 훅(차단): 사용자가 요청하지 않은 메모리 저장을 막음
 # 대상은 Claude 프로필의 projects/<프로젝트>/memory/ 아래 파일 쓰기, 읽기와 조회는 통과
-# 통과: 가장 최근 사용자 메시지에 메모리 저장·갱신 요청 표현이 있음("메모리 업데이트해", "기억해" 등)
-# 부정 표현("메모리에 저장하지 마")과 동사 없이 "기억"만 들어 있는 문장은 요청으로 보지 않음
-# 작업 도중 들어온 사용자 메시지(queued_command)도 최근 사용자 메시지로 읽음
+# 통과: 이번 턴 사용자 메시지(시작 메시지, 작업 중 queued_command, 질문 창 답)에 메모리 저장·갱신 요청 표현이 있음("메모리 업데이트해", "기억해" 등)
+# 부정 표현("메모리에 저장하지 마")과 동사 없이 "기억"만 들어 있는 문장은 요청으로 보지 않고, 요청보다 뒤에 온 부정 표현은 요청을 취소함
 # transcript를 읽지 못하면 막지 않고 통과, subagent 호출은 대상에서 제외
 
 input=$(cat)
@@ -85,15 +84,8 @@ def text_of(entry):
         return content
     return "\n".join(part.get("text", "") for part in content or [] if isinstance(part, dict) and part.get("type") == "text")
 
-latest = ""
-for entry in reversed(entries):
-    text = text_of(entry).strip()
-    if text and not text.startswith(MARKERS):
-        latest = text
-        break
-
-if not DENIED.search(latest):
-    for clause in re.split(r"(?<=[.!?？])\s+|\n", latest):
+def requested(text):
+    for clause in re.split(r"(?<=[.!?？])\s+|\n", text):
         found = REQUEST.search(clause)
         if found:
             rest = clause[found.end():]
@@ -102,10 +94,30 @@ if not DENIED.search(latest):
                 and (APPROVAL_ENDING.match(rest) or found.group().endswith("기억해")
                      or found.group().lower().startswith(("remember ", "잊지")))
             ):
-                sys.exit(0)
+                return True
+    return False
+
+# 이번 턴 시작 메시지부터 그 뒤 작업 중 메시지(queued_command)·질문 창 답까지 순서대로 보고, 더 뒤의 부정 표현이 앞선 요청을 취소함
+# 요청 뒤에 다른 작업 중 메시지가 와도 요청을 놓치지 않도록 마지막 메시지 하나만 보지 않음
+turn = []
+for entry in reversed(entries):
+    text = text_of(entry).strip()
+    if not text or text.startswith(MARKERS):
+        continue
+    turn.append(text)
+    if entry.get("type") == "user" and not isinstance((entry.get("toolUseResult") or {}).get("answers"), dict):
+        break
+allowed = False
+for text in reversed(turn):
+    if DENIED.search(text):
+        allowed = False
+    elif requested(text):
+        allowed = True
+if allowed:
+    sys.exit(0)
 
 sys.stderr.write(
-    "차단: 사용자가 요청하지 않은 메모리 저장입니다. 가장 최근 사용자 메시지에 메모리 저장·업데이트 요청이 없습니다.\n"
+    "차단: 사용자가 요청하지 않은 메모리 저장입니다. 이번 턴 사용자 메시지(작업 중 메시지 포함)에 메모리 저장·업데이트 요청이 없습니다.\n"
     "방침은 대화 안에서 지키고 작업 상태는 STATUS·HANDOFF에 적으세요. 저장이 필요하면 사용자에게 먼저 요청하세요.\n"
 )
 sys.exit(2)
