@@ -179,7 +179,8 @@ def approved_change(entries, root, data, targets):
     approved = False
     # 최종 청사진(내용이 마지막으로 바뀐 <harness-plan>) 이후의 사용자 메시지만 판정
     for role, text in parsed[plan_start + 1:]:
-        if role != "user":
+        # 도구 결과 항목은 사용자 쪽 기록이지만 본문이 비어 있어 승인 판정 대상이 아님
+        if role != "user" or not text.strip():
             continue
         if text.lstrip().startswith(("<hook_prompt", "<agent-message", "<task-notification>", "<system-reminder>")):
             continue

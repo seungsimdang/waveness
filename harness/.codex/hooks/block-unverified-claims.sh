@@ -105,7 +105,7 @@ for index, (role, content, payload) in enumerate(normalized):
     start = index + 1
 if why_prompt is None:
     if not latest_prompt or not re.search(
-        r"완료|끝냈|마쳤|마무리했|정리했|삭제했|제거했|남지 않|남아 있지 않|모두|전부|다 했|전환했|반영했|적용했|검증했|통과했", answer
+        r"(?:모두|전부|전체|다)\s*(?:완료|끝냈|마쳤|마무리했|정리했|삭제했|제거했|반영했|적용했)|완료했|끝냈|마쳤|마무리했|남지 않|남아 있지 않|다 했|동기화.*완료|커밋.*완료|푸시.*완료", answer
     ):
         sys.exit(0)
     why_prompt = latest_prompt
