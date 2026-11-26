@@ -133,15 +133,16 @@ test('실제 도구로 저장 버퍼·에이전트 편집을 수정하고 제외
 			[]
 		);
 		symlinkSync(join(source, 'auto-format.mjs'), join(root, 'outside.mjs'));
-		assert.throws(
-			() =>
-				autoFormat({
-					cwd: root,
-					tool_name: 'Edit',
-					tool_input: { file_path: 'outside.mjs' }
-				}),
-			/프로젝트 밖/
+		const outside = readFileSync(join(source, 'auto-format.mjs'), 'utf8');
+		assert.deepEqual(
+			autoFormat({
+				cwd: root,
+				tool_name: 'Edit',
+				tool_input: { file_path: 'outside.mjs' }
+			}),
+			[]
 		);
+		assert.equal(readFileSync(join(source, 'auto-format.mjs'), 'utf8'), outside);
 		for (const tool of ['.claude', '.codex']) {
 			writeFileSync(join(root, 'a.ts'), input);
 

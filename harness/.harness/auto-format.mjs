@@ -53,8 +53,8 @@ export function autoFormat(input) {
 		const path = realpathSync(resolve(root, file));
 		const local = relative(root, path);
 
-		if (local === '..' || local.startsWith('../') || isAbsolute(local))
-			throw new Error(`프로젝트 밖 파일은 자동 수정하지 않습니다: ${file}`);
+		// 스크래치패드 등 프로젝트 밖 파일은 포맷 대상이 아니라 실패 알림 없이 건너뜀
+		if (local === '..' || local.startsWith('../') || isAbsolute(local)) continue;
 
 		const before = readFileSync(path, 'utf8');
 		const after = formatBuffer(root, path, before);
