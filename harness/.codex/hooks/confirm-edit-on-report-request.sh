@@ -16,6 +16,10 @@ if [ "$event" = "UserPromptSubmit" ]; then
   # 사용자 문장이 없는 subagent 보고 전달이면 진행 중인 보고 전용 상태를 유지함
   [ -n "$(printf '%s' "$prompt" | tr -d '[:space:]')" ] || exit 0
   rm -f "$state"
+  # 질문 도구의 적용 선택지만 보고 전용 판정에서 제외
+  case "$prompt" in
+    "청사진대로 적용"|"청사진대로 적용 (권장)") exit 0 ;;
+  esac
   # 끝이 판단·검토·보고·제시인 요청만 대상으로 하고 실행 지시가 함께 있으면 제외
   printf '%s' "$prompt" | grep -qE '(판단|검토|분석|조사|확인)[^.?!]*(보고|알려)|청사진|보고해|보고만' || exit 0
   printf '%s' "$prompt" | grep -qE 'ㄱㄱ|진행해|고쳐|수정해|수정[[:space:]]*(하고|하여)([[:space:].!?]|$)|수정[[:space:]]*후[[:space:]]+(진행|마무리|amend|커밋|푸시)|적용해|반영해|작업해|구현해|추가해|바꿔|변경해|삭제해|커밋해|푸시해([[:space:].!?]|$)|amend[[:space:]]*(후|하고|하여|해)([[:space:].!?]|$)|강제해|승인([[:space:].!]|$)|승인해' && exit 0
