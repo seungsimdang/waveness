@@ -23,7 +23,7 @@
 `require-isolation-when-dirty.sh`가 아래 1·2번을 강제한다. Codex는 subagent 격리 옵션이 문서화돼 있지 않아 이 절은 Claude에만 적용한다.
 
 1. 파일을 고칠 수 있는 subagent(정의 `tools`에 Edit·Write·NotebookEdit·Bash가 있거나 `tools`가 없는 역할, 이름이 알려지지 않은 내장 에이전트)는 `Agent(isolation: "worktree")`로만 스폰한다. 읽기 전용 역할(`Explore`, `Plan`, `claude-code-guide`, `web-fetch`, 쓰기 도구 없는 정의)은 격리하지 않아도 된다.
-2. 격리 worktree는 `.claude/settings.json`의 `worktree.baseRef: "head"`에 따라 커밋된 HEAD에서 만들어지고 미커밋 변경은 빠진다. 스폰 전에 자신의 작업 변경을 브랜치의 작업 커밋에 `git commit --amend --no-edit`로 합쳐 메인 트리를 비운다. 작업 커밋이 아직 없으면 `itd-commit`으로 첫 커밋 승인을 먼저 받는다. 자신이 만들지 않은 변경은 커밋하지 않고 사용자에게 보고한다.
+2. 격리 worktree는 `.claude/settings.json`의 `worktree.baseRef: "head"`에 따라 커밋된 HEAD에서 만들어지고 미커밋 변경은 빠진다. 스폰 전 미커밋 변경은 `itd-commit`으로 사용자 승인을 받아 커밋(작업 커밋이 있으면 amend)한 뒤 스폰한다. 자신이 만들지 않은 변경은 커밋하지 않고 사용자에게 보고한다.
 3. 격리된 subagent는 worktree 안에서 커밋하지 않는다. 시작할 때 `pnpm install --frozen-lockfile --prefer-offline`처럼 프로젝트 설치 명령을 먼저 실행한다(worktree에는 `node_modules`가 없음). dev 서버는 메인 세션과 겹치지 않는 포트를 쓴다.
 4. 완료 알림의 `worktreePath`에서 변경을 회수한다: `git -C <worktreePath> add -A && git -C <worktreePath> diff --cached --binary | git apply --index`. 적용이 실패하면 메인 트리를 건드리지 않고 사용자에게 보고한다.
 5. 회수 후 `git worktree remove --force <worktreePath>`와 `git branch -d <worktreeBranch>`로 정리한다. 3번 규칙대로 커밋이 없으면 `-d`로 지워지며, 지워지지 않으면 강제 삭제하지 않고 보고한다.

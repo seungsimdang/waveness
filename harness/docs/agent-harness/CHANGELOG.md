@@ -1,5 +1,15 @@
 # 하네스 변경 이력
 
+## 2026-11-26 fix(harness): 승인 없는 스폰 전 amend 예외 제거와 판정 훅 오탐 수정
+
+- Harness-Origin: `amore-box-handling-frontend@3326bd6292da1a1debb26e86e22109cadf10b428`
+
+> - 격리 subagent 스폰 전 amend --no-edit를 승인 없이 허용하던 예외를 AGENTS.md·git-safety·itd-commit·feature-team-orchestrator에서 제거하고 itd-commit 승인 커밋 후 스폰으로 통일
+> - 청사진 승인 판정이 본문 없는 도구 결과 항목을 사용자 답변으로 판정해 승인 직후 도구 호출만으로 승인이 무효가 되던 문제 수정
+> - 확인 질문 Stop 훅이 작업 중 입력돼 아직 전달되지 않은 질문으로 턴 종료를 막던 문제 수정
+> - 질문 응답 훅 차단 문구를 도구 호출 직전 텍스트가 판정에 안 보일 수 있는 실제 상황에 맞게 수정
+> - 승인 판정·확인 질문 훅 회귀 테스트 추가
+
 ## 2026-11-25 fix(harness): 청사진 승인 질문에서 사용자가 볼 수 있는 청사진 강제
 
 > - `require-blueprint-before-harness-approval.sh`가 질문 창 문구와 도구 호출이 없는 메시지의 텍스트(뒤에 사용자 항목이 기록된 것)만 화면에 보인 글로 인정. 질문 창과 같은 응답 본문, 도구 호출과 같은 message.id의 텍스트는 진행 요약으로 바뀔 수 있어 제외
