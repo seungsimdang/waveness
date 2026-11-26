@@ -121,6 +121,7 @@ except (OSError, ValueError, IndexError, KeyError, TypeError, AttributeError):
 # 중간 블록까지 후보로 넓히면 다른 대상에 한 "네"나 진행 안내가 판정으로 인정돼 미탐이 생기므로 첫 블록 하나로 고정함
 # Claude와 Codex transcript를 같은 방식으로 해석하고, 첫 블록을 찾지 못하면 마지막 응답으로 판정함
 first_text = None
+delivered = []
 try:
     entries = [json.loads(line) for line in open(data.get("transcript_path") or "", encoding="utf-8") if line.strip()]
 except Exception:
@@ -132,6 +133,8 @@ for entry in entries:
     attachment = entry.get("attachment") if entry.get("type") == "attachment" else None
     if isinstance(attachment, dict):
         queued = str(attachment.get("prompt") or "")
+        if attachment.get("type") == "queued_command" and queued.strip():
+            delivered.append(queued)
         if attachment.get("type") == "queued_command" and queued.strip() and not queued.lstrip().startswith("<agent-message"):
             first_text = None
         continue
@@ -145,10 +148,17 @@ for entry in entries:
     if role == "user":
         # 도구 결과만 담긴 user 항목과 훅·내부 문맥은 턴 경계가 아님
         text = "\n".join(texts)
+        delivered.append(text)
         if text.strip() and not text.lstrip().startswith(("<hook_prompt", "<codex_internal_context", "<agent-message")):
             first_text = None
     elif role == "assistant" and first_text is None:
         first_text = next((text for text in texts if text.strip()), None)
+
+# 작업 중에 입력한 메시지는 UserPromptSubmit이 먼저 실행돼 표시만 남고 응답에는 아직 전달되지 않았을 수 있음
+# transcript에 전달 기록이 없는 질문은 이번 응답이 답할 수 없으므로 판정하지 않고 표시를 남겨 전달 뒤 턴에서 판정함
+probe = next((line.strip() for line in user_prompt.splitlines() if line.strip()), "")[:80]
+if entries and probe and not any(probe in text for text in delivered):
+    sys.exit(0)
 
 # 제목·강조·인용 기호를 걷어낸 뒤 첫머리가 판정인지 봄
 # 확인·가능 여부의 판정어는 지정된 두 값으로 제한함

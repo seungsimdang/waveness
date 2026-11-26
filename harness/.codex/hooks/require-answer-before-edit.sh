@@ -233,7 +233,7 @@ if event == "PreToolUse":
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "답하지 않은 사용자 질문이 있습니다: " + question
+        "permissionDecisionReason": "이번 턴 응답 텍스트에서 이 질문의 답을 찾지 못했습니다(도구 호출 직전에 쓴 텍스트는 아직 기록에 없어 판정에 보이지 않을 수 있음): " + question
         + f" {action}기 전에 이 질문의 답을 응답 텍스트로 먼저 쓰세요. "
         + ("질문 창은 답을 본 사용자의 다음 메시지 이후에 띄우세요." if asking else "답을 쓴 뒤 같은 수정을 다시 시도하면 통과합니다.")
         + " 도구 호출 앞 텍스트는 진행 요약으로 바뀌어 사용자에게 보이지 않고 기록되지 않을 수 있으니, 답은 도구 호출 없이 응답 마지막 텍스트로 쓰고 턴을 끝내는 것이 확실합니다."

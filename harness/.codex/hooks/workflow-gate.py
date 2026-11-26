@@ -127,14 +127,19 @@ JSON만 출력: {"block": true 또는 false, "reason": "한국어 이유", "unce
     public_action = {key: value for key, value in action.items() if key not in ('command', 'targets')}
     request = json.dumps({'policy': policy, 'user_instructions': prompts, 'proposed_action': public_action, 'verification': evidence}, ensure_ascii=False)
     try:
+        harness_dir = str(Path(__file__).resolve().parents[2] / '.harness')
+        if harness_dir not in sys.path:
+            sys.path.insert(0, harness_dir)
+        from judge_command import judge_command
         with tempfile.NamedTemporaryFile('r', encoding='utf-8') as result:
-            done = subprocess.run(['codex', 'exec', '--ephemeral', '--disable', 'hooks', '-s', 'read-only', '--skip-git-repo-check', '--color', 'never', '-o', result.name, '-'], input=request, text=True, capture_output=True, timeout=45, cwd=Path(result.name).parent, env={**os.environ, 'HARNESS_STOP_JUDGE': '1'})
+            command, stdin_data = judge_command('codex', request, result.name)
+            done = subprocess.run(command, input=stdin_data, text=True, capture_output=True, timeout=45, cwd=Path(result.name).parent, env={**os.environ, 'HARNESS_STOP_JUDGE': '1'})
             if done.returncode != 0:
                 return None
             verdict = json.loads(result.read())
             if isinstance(verdict, dict) and isinstance(verdict.get('block'), bool) and isinstance(verdict.get('reason'), str):
                 return verdict
-    except (OSError, ValueError, subprocess.TimeoutExpired):
+    except (OSError, ValueError, ImportError, subprocess.TimeoutExpired):
         pass
     return None
 
@@ -303,13 +308,13 @@ def hook(data):
             if len(pending) > 64:
                 pending.pop(next(iter(pending)))
         evidence = {'checks': state['checks']}
-        if state['prompts'] and not action['verify'] and (action['mutate'] or action['transition'] or event == 'Stop'):
+        if state['prompts'] and not action['verify'] and (action['transition'] or event == 'Stop'):
             snapshot, required = workspace(root)
             evidence.update(snapshot=snapshot, missing=missing_checks(state, snapshot, required))
         answer = data.get('last_assistant_message', '')
         if event == 'Stop':
             action = {'report': redact(answer)[:6000]}
-        if (event == 'PreToolUse' and not action.get('verify') and (action.get('mutate') or action.get('transition'))) or event == 'Stop':
+        if (event == 'PreToolUse' and not action.get('verify') and action.get('transition')) or event == 'Stop':
             verdict = judge(state['prompts'], action, evidence)
             if verdict and verdict['block'] and not data.get('stop_hook_active'):
                 deny(event, verdict['reason'])
