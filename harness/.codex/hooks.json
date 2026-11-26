@@ -261,6 +261,10 @@
 					},
 					{
 						"type": "command",
+						"command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/require-ask-tool-for-decisions.py\""
+					},
+					{
+						"type": "command",
 						"command": "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/block-reask-after-free-text-answer.sh\" stop"
 					}
 				]

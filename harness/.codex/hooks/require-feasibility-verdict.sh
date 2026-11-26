@@ -38,6 +38,26 @@ def clear_mark():
 
 event = data.get("hook_event_name")
 
+reply_tag = "<send_user_message_question_reply>"
+
+def user_reply_text(text):
+    value = text.strip()
+    if not value.startswith(reply_tag):
+        return text
+    closing_tag = "</send_user_message_question_reply>"
+    if not value.endswith(closing_tag):
+        return ""
+    try:
+        replies = json.loads(value[len(reply_tag):-len(closing_tag)].strip().removeprefix("user:").lstrip())
+    except ValueError:
+        return ""
+    if not isinstance(replies, list):
+        return ""
+    return "\n".join(
+        reply["answer"] for reply in replies
+        if isinstance(reply, dict) and isinstance(reply.get("answer"), str)
+    )
+
 def current_request():
     try:
         with open(mark, encoding="utf-8") as candidates:
@@ -55,9 +75,13 @@ if event == "PostToolUse":
     sys.exit(0)
 
 if event != "Stop":
+    raw_prompt = data.get("prompt") or ""
+    if raw_prompt.lstrip().startswith(reply_tag):
+        # 질문 도구 응답으로 이전 질문 후보를 넘기지 않음
+        clear_mark()
     # 자동 에이전트 보고는 사용자 질문에서 제외함
     # 붙여넣은 인용 자료는 사용자 질문에서 제외함
-    prompt = re.sub(r"<agent-message\b.*?(</agent-message>|\Z)", "", data.get("prompt") or "", flags=re.S)
+    prompt = re.sub(r"<agent-message\b.*?(</agent-message>|\Z)", "", user_reply_text(raw_prompt), flags=re.S)
     prompt = re.sub(r"<pasted_content id=\"([^\"]*)\">.*?(</pasted_content id=\"\1\">|\Z)", "", prompt, flags=re.S)
     if not prompt.strip() or re.fullmatch(r"\s*Another Claude session sent a message[^\n]*\s*", prompt):
         # 사용자 문장이 없는 보고 전달이면 진행 중인 질문의 표시를 지우지 않고 그대로 둠
@@ -134,7 +158,7 @@ for entry in entries:
     if isinstance(attachment, dict):
         queued = str(attachment.get("prompt") or "")
         if attachment.get("type") == "queued_command" and queued.strip():
-            delivered.append(queued)
+            delivered.append(user_reply_text(queued))
         if attachment.get("type") == "queued_command" and queued.strip() and not queued.lstrip().startswith("<agent-message"):
             first_text = None
         continue
@@ -148,7 +172,7 @@ for entry in entries:
     if role == "user":
         # 도구 결과만 담긴 user 항목과 훅·내부 문맥은 턴 경계가 아님
         text = "\n".join(texts)
-        delivered.append(text)
+        delivered.append(user_reply_text(text))
         if text.strip() and not text.lstrip().startswith(("<hook_prompt", "<codex_internal_context", "<agent-message")):
             first_text = None
     elif role == "assistant" and first_text is None:

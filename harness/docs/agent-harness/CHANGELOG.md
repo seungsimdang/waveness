@@ -1,5 +1,14 @@
 # 하네스 변경 이력
 
+## 2026-11-26 fix(harness): Codex 질문 도구 응답 판정과 결정 요청 유도 훅 추가
+
+- Harness-Origin: `amore-box-handling-frontend@542b3d1905c9828c67828c05131a38255eada1d5`
+
+> - 확인 질문 훅이 질문 도구 응답 태그 안의 답변만 사용자 문장으로 판정하고 이전 질문 표시를 정리하도록 수정
+> - 보고 전용 판정에서 질문 도구의 "청사진대로 적용" 선택지 제외
+> - 일반 응답에 남긴 결정·승인 요청을 질문 도구로 유도하는 Codex Stop 훅 추가
+> - 질문 도구 응답·결정 요청 훅 회귀 테스트 추가
+
 ## 2026-11-26 fix(harness): 승인 없는 스폰 전 amend 예외 제거와 판정 훅 오탐 수정
 
 - Harness-Origin: `amore-box-handling-frontend@3326bd6292da1a1debb26e86e22109cadf10b428`

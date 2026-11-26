@@ -883,6 +883,20 @@ for (const tool of ['.claude', '.codex']) {
 			};
 
 			const confirm = '이 브랜치 병합됐나요?';
+			if (tool === '.codex') {
+				const question = '두 Stop 훅의 신뢰 기록을 갱신할까요?';
+				const reply = (text, prefix = '') =>
+					'<send_user_message_question_reply>' + prefix + JSON.stringify([{ answer: text, question }]) +
+					'</send_user_message_question_reply>';
+				assert.equal(answer(codexEntry, reply('신뢰 기록 2건 승인해'), ['갱신했습니다.']), '');
+				assert.equal(readFileSync(join(marks, 'seen'), 'utf8'), '');
+				assert.equal(answer(codexEntry, reply('이 브랜치 병합됐나요?', 'user: '), ['네. 병합됐습니다.']), '');
+				assert.equal(
+					JSON.parse(answer(codexEntry, reply('이 브랜치 병합됐나요?'), ['상태를 확인했습니다.'])).decision,
+					'block'
+				);
+				assert.doesNotMatch(readFileSync(join(marks, 'seen'), 'utf8'), /신뢰 기록을 갱신할까요/);
+			}
 			assert.equal(answer(claudeEntry, '가능한 방법은 확인했나요?', ['네. 확인했습니다.']), '');
 			assert.equal(answer(codexEntry, '확인했습니까', ['네. 확인했습니다.']), '');
 			const feasible = '훅으로 강제할 수 있는지 검토 후 보고해';
@@ -2164,6 +2178,12 @@ for (const tool of ['.claude', '.codex']) test(`${tool} 질문 창의 질문 본
  assert.equal(JSON.parse(edit().stdout).hookSpecificOutput.permissionDecision, 'ask');
  submit('<send_user_message_question_reply>[{"answer":"수정해", "question":"보고만 할까요?"}]</send_user_message_question_reply>');
  assert.equal(edit().stdout.trim(), '');
+ if (tool === '.codex') {
+  submit('“청사진대로 적용 (권장)” 문구를 검토하고 보고만 해');
+  assert.equal(JSON.parse(edit().stdout).hookSpecificOutput.permissionDecision, 'ask');
+  submit('<send_user_message_question_reply>[{"answer":"청사진대로 적용 (권장)","question":"청사진을 검토하고 적용할까요?"}]</send_user_message_question_reply>');
+  assert.equal(edit().stdout.trim(), '');
+ }
  const invalid = extract('<send_user_message_question_reply>invalid</send_user_message_question_reply>');
  assert.equal(invalid.status, 0, invalid.stderr);
  assert.equal(invalid.stdout.trim(), '');
@@ -2333,6 +2353,40 @@ for (const tool of ['.claude', '.codex']) test(`${tool} 질문 응답 훅이 한
 		// 턴 끝 Stop은 모든 질문을 판정
 		assert.notEqual(call({ hook_event_name: 'Stop', last_assistant_message: '진행합니다.' }), '');
 		assert.ok(readFileSync(captured, 'utf8').includes('왜 순서를 바꿈?'));
+	});
+});
+
+test('Codex 결정 질문 Stop 훅은 텍스트 승인 요청을 막고 질문 도구 답변은 허용한다', () => {
+	withTmp('codex-decision-question-', tmp => {
+		const transcript = join(tmp, 'rollout.jsonl');
+		const message = text => ({ payload: { type: 'message', role: 'user', content: [{ text }] } });
+		const prompt = message('해당 경고도 함께 해결해');
+		const reply = message('<send_user_message_question_reply>[{"answer":"승인"}]</send_user_message_question_reply>');
+		const decide = (text, entries, stopHookActive = false) => {
+			writeFileSync(transcript, entries.map(entry => JSON.stringify(entry)).join('\n'));
+			const result = spawnSync('python3', [resolve(H, '.codex/hooks/require-ask-tool-for-decisions.py')], {
+				input: JSON.stringify({
+					last_assistant_message: text,
+					transcript_path: transcript,
+					stop_hook_active: stopHookActive,
+				}),
+				encoding: 'utf8',
+			});
+			assert.equal(result.status, 0, result.stderr);
+			return result.stdout.trim() ? JSON.parse(result.stdout).decision : 'allow';
+		};
+		const approval = '승인해 주시면 기존 Vercel 종료 훅 한 건의 신뢰 기록만 갱신하겠습니다.';
+		assert.equal(decide(approval, [prompt]), 'block');
+		assert.equal(decide('이 변경을 적용할까요?', [prompt]), 'block');
+		assert.equal(decide('사용할 티켓 번호를 알려주세요.', [prompt]), 'allow');
+		assert.equal(decide('> 승인해 주세요.', [prompt]), 'allow');
+		assert.equal(decide(approval, [prompt, reply]), 'allow');
+		assert.equal(decide(approval, [reply, prompt]), 'block');
+		assert.equal(decide(approval, [prompt], true), 'allow');
+		const config = JSON.parse(readFileSync(resolve(H, '.codex/hooks.json'), 'utf8'));
+		assert.ok(config.hooks.Stop.some(group => group.hooks.some(
+			hook => hook.command.includes('/.codex/hooks/require-ask-tool-for-decisions.py')
+		)));
 	});
 });
 
