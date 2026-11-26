@@ -257,6 +257,10 @@
           },
           {
             "type": "command",
+            "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" python3 \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/require-ask-tool-for-decisions.py\""
+          },
+          {
+            "type": "command",
             "command": "CLAUDE_PROJECT_DIR=\"$(git rev-parse --show-toplevel)/harness\" sh \"$(git rev-parse --show-toplevel)/harness/.codex/hooks/block-reask-after-free-text-answer.sh\" stop"
           }
         ]
