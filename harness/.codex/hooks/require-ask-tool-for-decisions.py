@@ -2,7 +2,6 @@
 import json
 import re
 import sys
-from pathlib import Path
 
 
 def main():
@@ -10,8 +9,7 @@ def main():
     if data.get("stop_hook_active") or data.get("agent_id"):
         return
     answer = data.get("last_assistant_message") or ""
-    path = data.get("transcript_path")
-    if not answer or not path:
+    if not answer:
         return
 
     # 인용된 질문과 코드 예시는 판정에서 제외
@@ -25,28 +23,10 @@ def main():
     ):
         return
 
-    with Path(path).open(encoding="utf-8") as transcript:
-        answered = False
-        for line in transcript:
-            try:
-                entry = json.loads(line)
-            except ValueError:
-                continue
-            payload = entry.get("payload") or {}
-            if payload.get("type") != "message" or payload.get("role") != "user":
-                continue
-            message = "\n".join(
-                part.get("text", "") for part in payload.get("content") or []
-                if isinstance(part, dict)
-            ).lstrip()
-            if message.startswith(("<hook_prompt", "<codex_internal_context")):
-                continue
-            answered = message.startswith("<send_user_message_question_reply>")
-    if not answered:
-        print(json.dumps({
-            "decision": "block",
-            "reason": "결정·승인 요청은 일반 응답에 남기지 말고 Codex 사용자 질문 도구로 요청할 것.",
-        }, ensure_ascii=False))
+    print(json.dumps({
+        "decision": "block",
+        "reason": "결정·승인 요청은 일반 응답에 남기지 말고 Codex 사용자 질문 도구로 요청할 것.",
+    }, ensure_ascii=False))
 
 
 if __name__ == "__main__":

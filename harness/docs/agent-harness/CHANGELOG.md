@@ -1,5 +1,12 @@
 # 하네스 변경 이력
 
+## 2026-11-26 fix(harness): Codex 새 승인 요청의 이전 답변 예외 제거
+
+- Harness-Origin: `amore-box-handling-frontend@d8294787907d43bed7eb0b298538ec0c759dd3b8`
+
+> - 원인: 직전 질문 도구 답변이 있으면 새 승인 요청도 일반 응답에서 통과
+> - 해결: 현재 응답의 새 승인 요청을 질문 도구로 유도하고 완료 보고와 인용문 통과를 회귀 테스트로 검증
+
 ## 2026-11-26 fix(harness): Codex 질문 도구 응답 판정과 결정 요청 유도 훅 추가
 
 - Harness-Origin: `amore-box-handling-frontend@542b3d1905c9828c67828c05131a38255eada1d5`

@@ -2356,7 +2356,7 @@ for (const tool of ['.claude', '.codex']) test(`${tool} 질문 응답 훅이 한
 	});
 });
 
-test('Codex 결정 질문 Stop 훅은 텍스트 승인 요청을 막고 질문 도구 답변은 허용한다', () => {
+test('Codex 결정 질문 Stop 훅은 이전 질문에 답했어도 새 승인 요청을 막는다', () => {
 	withTmp('codex-decision-question-', tmp => {
 		const transcript = join(tmp, 'rollout.jsonl');
 		const message = text => ({ payload: { type: 'message', role: 'user', content: [{ text }] } });
@@ -2380,7 +2380,9 @@ test('Codex 결정 질문 Stop 훅은 텍스트 승인 요청을 막고 질문 �
 		assert.equal(decide('이 변경을 적용할까요?', [prompt]), 'block');
 		assert.equal(decide('사용할 티켓 번호를 알려주세요.', [prompt]), 'allow');
 		assert.equal(decide('> 승인해 주세요.', [prompt]), 'allow');
-		assert.equal(decide(approval, [prompt, reply]), 'allow');
+		assert.equal(decide(approval, [prompt, reply]), 'block');
+		assert.equal(decide('다음 변경도 승인해 주세요.', [prompt, reply]), 'block');
+		assert.equal(decide('승인해 주신 변경을 반영했습니다.', [prompt, reply]), 'allow');
 		assert.equal(decide(approval, [reply, prompt]), 'block');
 		assert.equal(decide(approval, [prompt], true), 'allow');
 		const config = JSON.parse(readFileSync(resolve(H, '.codex/hooks.json'), 'utf8'));
