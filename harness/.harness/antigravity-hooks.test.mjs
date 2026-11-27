@@ -139,6 +139,7 @@ const firstRole = readdirSync(join(H, '.agents/agents'))
 	.filter(file => file.endsWith('.md'))
 	.map(file => file.slice(0, -3))
 	.sort()[0];
+
 const firstRoleModel = readFileSync(join(H, `.agents/agents/${firstRole}.md`), 'utf8')
 	.split(/^---$/m)[1]
 	.match(/^swarm_model:\s*(\S+)\s*$/m)[1];
@@ -291,6 +292,7 @@ print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 		}
 
 		const beforeSha = createHash('sha256').update('old\n').digest('hex');
+
 		const editPayload = {
 			input: {
 				file_path: targetFile,
@@ -299,32 +301,40 @@ print(json.dumps({"decision": decision, "evidence": text}, ensure_ascii=False))
 			},
 			tool: 'Edit'
 		};
+
 		const editSha = createHash('sha256').update(JSON.stringify(editPayload)).digest('hex');
+
 		const plan = {
 			id: 'agy-plan',
 			skill: 'harness-lab',
 			root: project,
 			changes: [{ before_sha256: { [targetRel]: beforeSha }, edit_sha256: editSha }]
 		};
+
 		const planEntry = {
 			type: 'PLANNER_RESPONSE',
 			content: `<harness-plan>${JSON.stringify(plan)}</harness-plan>`
 		};
+
 		const approveEntry = {
 			type: 'USER_INPUT',
 			content:
 				'<USER_REQUEST>\n승인\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\n2026-11-19\n</ADDITIONAL_METADATA>'
 		};
+
 		const revokeEntry = {
 			type: 'USER_INPUT',
 			content: '<USER_REQUEST>\n승인 취소\n</USER_REQUEST>'
 		};
+
 		const transcript = join(project, 'transcript.jsonl');
 		const fullTranscript = join(project, 'transcript_full.jsonl');
+
 		const editEnv = {
 			CLAUDE_PROJECT_DIR: project,
 			PATH: `${join(project, 'bin')}:${process.env.PATH}`
 		};
+
 		const editCall = transcriptPath =>
 			runAdapter(
 				'pre-tool-edit',
@@ -390,7 +400,9 @@ const agyUser = text => ({
 	type: 'USER_INPUT',
 	content: `<USER_REQUEST>\n${text}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nx\n</ADDITIONAL_METADATA>`
 });
+
 const agyReply = text => ({ type: 'PLANNER_RESPONSE', content: text });
+
 const agyEdit = transcriptPath => ({
 	toolCall: {
 		id: 'e1',
@@ -416,6 +428,7 @@ test('Antigravity 질문 응답 훅이 USER_INPUT 질문을 agy 런타임 판정
 			STOP_JUDGE_BIN: judge,
 			TMPDIR: dir
 		});
+
 		const prompt = readFileSync(captured, 'utf8');
 
 		assert.equal(out.decision, 'deny');
@@ -470,14 +483,17 @@ test('Antigravity 재질문 훅이 ask_question 직접 입력 질문 뒤 수정�
 	const questions = [
 		{ question: '높이?', options: ['(Recommended) 고정', '부모'], is_multi_select: false }
 	];
+
 	const asked = [
 		agyUser('나머지 질문해'),
 		{ type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'ask_question', args: { questions } }] }
 	];
+
 	const answer = text => ({
 		type: 'GENERIC',
 		content: `Created At: x\nCompleted At: x\nA1: ${text}`
 	});
+
 	const askCall = transcriptPath => ({
 		toolCall: { id: 'q1', name: 'ask_question', args: { questions } },
 		transcriptPath,
@@ -523,6 +539,7 @@ test('Antigravity hooks.json이 질문 훅 3종을 등록하고 어댑터가 실
 	]) {
 		assert.ok(commands.includes(hook), hook);
 	}
+
 	assert.ok(
 		config.PreToolUse.some(
 			({ matcher, hooks }) =>

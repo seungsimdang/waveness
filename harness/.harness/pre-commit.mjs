@@ -153,6 +153,7 @@ export function runChecks(root, { ci = false, base, execute = command } = {}) {
 
 	const localName = ci ? '' : localSetting('identityName');
 	const localEmail = ci ? '' : localSetting('identityEmail');
+
 	const identity =
 		plan.identity ?? (localName || localEmail ? { name: localName, email: localEmail } : null);
 

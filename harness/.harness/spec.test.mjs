@@ -9,11 +9,13 @@ import { fileURLToPath } from 'node:url';
 // 프로젝트에서는 저장소 루트, 허브에서는 harness/
 const H = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = path => readFileSync(join(H, path), 'utf8');
+
 const names = (dir, ext) =>
 	readdirSync(join(H, dir))
 		.filter(f => f.endsWith(ext))
 		.map(f => f.slice(0, -ext.length))
 		.sort();
+
 const walk = dir =>
 	readdirSync(dir, { withFileTypes: true }).flatMap(e =>
 		e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
@@ -28,8 +30,11 @@ test('역할은 Claude판과 Codex판의 집합·설명·본문이 같음', () =
 		const [, front, ...rest] = read(`.claude/agents/${role}.md`).split(/^---$/m);
 		const toml = read(`.codex/agents/${role}.toml`);
 		const description = front.match(/^description: (.*)$/m)[1];
+
 		assert.equal(JSON.parse(toml.match(/^description = (".*")$/m)[1]), description, role);
+
 		const body = toml.match(/^developer_instructions = """\n([\s\S]*?)"""$/m)[1];
+
 		// Codex는 CLAUDE.md를 읽지 않아 Claude판에만 있는 참조는 비교에서 뺌
 		assert.equal(roleBody(rest.join('---')), roleBody(body), role);
 	}
@@ -38,6 +43,7 @@ test('역할은 Claude판과 Codex판의 집합·설명·본문이 같음', () =
 test('역할 본문의 도구별 스킬 경로 차이는 허용하되 절차 차이는 구분함', () => {
 	const claude = '커밋 전 `.claude/skills/git-commit/SKILL.md`를 읽는다.';
 	const codex = '커밋 전 `.agents/skills/git-commit/SKILL.md`를 읽는다.';
+
 	assert.equal(roleBody(claude), roleBody(codex));
 	assert.notEqual(roleBody(claude), roleBody(codex.replace('읽는다', '읽지 않는다')));
 });
@@ -47,6 +53,7 @@ test('스킬은 .claude/skills와 .agents/skills의 파일 집합이 같음', ()
 		walk(join(H, dir))
 			.map(f => relative(join(H, dir), f))
 			.sort();
+
 	assert.deepEqual(files('.claude/skills'), files('.agents/skills'));
 });
 
@@ -62,6 +69,7 @@ test('훅 등록이 가리키는 파일이 모두 있음', () => {
 			/\.(?:agents|claude|codex|harness)\/[\w/-]+\.(?:sh|mjs|py)/g
 		)
 	].map(([path]) => path);
+
 	assert.ok(commands.length > 0);
 	for (const path of commands) assert.ok(existsSync(join(H, path)), path);
 });
@@ -74,7 +82,9 @@ const AGENT_SECTIONS = [
 	'팀 통신 프로토콜',
 	'하지 말아야 할 일'
 ];
+
 const PROTOCOL_ITEMS = ['메시지 수신', '메시지 발신', '작업 요청', '파일 산출물', '차단 조건'];
+
 const ORCHESTRATOR_SECTIONS = [
 	'목적',
 	'실행 모드',
@@ -86,6 +96,7 @@ const ORCHESTRATOR_SECTIONS = [
 	'산출물 계약',
 	'테스트 프롬프트'
 ];
+
 const SKILL_SECTIONS = [
 	'역할',
 	'사용 조건',
@@ -95,6 +106,7 @@ const SKILL_SECTIONS = [
 	'품질 기준',
 	'테스트 프롬프트'
 ];
+
 // 외부 가이드와 별도 형식으로 작성된 스킬은 각자의 기존 계약을 검사
 const SKILL_CONTRACTS = {
 	'scaffold-web-project': ['입력 확인', '구성 순서', '완료 기준', '사용 예시'],
@@ -116,8 +128,10 @@ const SKILL_CONTRACTS = {
 	'coderabbit-triage': ['Overview', 'Workflow', '출력 형식', '품질 기준', '예외 상황'],
 	'finding-validity-gate': ['Overview', '트리거', '절차', '출력 형식', '품질 기준', '예외']
 };
+
 const checkHeadings = (source, headings, file) => {
 	const lines = source.split('\n').map(line => line.trimEnd());
+
 	for (const heading of headings)
 		assert.ok(lines.includes(`## ${heading}`), `${file}: ## ${heading}`);
 };
@@ -126,6 +140,7 @@ test('역할 명세에 필수 절·팀 통신 항목과 도구별 메타데이�
 	for (const role of names('.claude/agents', '.md')) {
 		const claude = read(`.claude/agents/${role}.md`);
 		const codex = read(`.codex/agents/${role}.toml`);
+
 		for (const [file, source] of [
 			[`${role}.md`, claude],
 			[`${role}.toml`, codex]
@@ -137,6 +152,7 @@ test('역할 명세에 필수 절·팀 통신 항목과 도구별 메타데이�
 				'prior-art-researcher',
 				'spec-planner'
 			].includes(role);
+
 			checkHeadings(
 				source,
 				role === 'implementer'
@@ -149,7 +165,9 @@ test('역할 명세에 필수 절·팀 통신 항목과 도구별 메타데이�
 				: PROTOCOL_ITEMS)
 				assert.ok(source.includes(item), `${file}: ${item}`);
 		}
+
 		const front = claude.split(/^---$/m)[1];
+
 		assert.match(front, /^model: \S+/m, role);
 		assert.match(front, /^tools: \S+/m, role);
 		assert.match(codex, /^model = "[^"\n]+"$/m, role);
@@ -170,6 +188,7 @@ test('Antigravity 네이티브 역할 명세가 Claude·Codex 역할 집합·설
 		const toml = read(`.codex/agents/${role}.toml`);
 		const claudeDescription = claudeFront.match(/^description: (.*)$/m)[1];
 		const tomlBody = toml.match(/^developer_instructions = """\n([\s\S]*?)"""$/m)[1];
+
 		assert.match(front, new RegExp(`^name: ${role}$`, 'm'), role);
 		assert.equal(front.match(/^description: (.*)$/m)?.[1], claudeDescription, role);
 		assert.equal(roleBody(rest.join('---')), roleBody(claudeRest.join('---')), role);
@@ -186,8 +205,10 @@ test('양쪽 스킬 명세에 해당 작성 형식의 필수 절이 있음', () 
 		const headings =
 			SKILL_CONTRACTS[skill] ??
 			(skill.endsWith('-orchestrator') ? ORCHESTRATOR_SECTIONS : SKILL_SECTIONS);
+
 		for (const tool of ['.claude', '.agents']) {
 			const file = `${tool}/skills/${skill}/SKILL.md`;
+
 			checkHeadings(read(file), headings, file);
 		}
 	}

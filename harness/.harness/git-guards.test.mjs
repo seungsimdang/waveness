@@ -10,6 +10,7 @@ const H = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('공용 소스·문서 검사가 작업 트리 대신 인덱스 내용을 확인한다', () => {
 	const fixture = mkdtempSync(join(tmpdir(), 'portfolio-git-guards-'));
+
 	const run = (command, args, expected = 0, extraEnv = {}) => {
 		const result = spawnSync(command, args, {
 			cwd: fixture,
@@ -21,15 +22,19 @@ test('공용 소스·문서 검사가 작업 트리 대신 인덱스 내용을 �
 				...extraEnv
 			}
 		});
+
 		assert.equal(result.status, expected, `${result.stdout}\n${result.stderr}`);
 	};
+
 	try {
 		cpSync(join(H, '.harness'), join(fixture, 'scripts'), { recursive: true });
 		mkdirSync(join(fixture, 'src/app'), { recursive: true });
 		run('git', ['init', '-q']);
 		run('git', ['config', 'user.name', 'SeungHyun Lee']);
 		run('git', ['config', 'user.email', 'test@example.com']);
+
 		const source = join(fixture, 'src/app/page.tsx');
+
 		writeFileSync(source, 'export const text = "clean";\n');
 		run('git', ['add', 'src/app/page.tsx']);
 		run('sh', ['scripts/check-em-dash-in-source.sh', 'src/app/page.tsx']);
@@ -43,6 +48,7 @@ test('공용 소스·문서 검사가 작업 트리 대신 인덱스 내용을 �
 		run('sh', ['scripts/check-ephemeral-comment-refs.sh', 'src/app/page.tsx'], 1);
 
 		const doc = join(fixture, 'sample.md');
+
 		writeFileSync(doc, 'A complete paragraph.\n');
 		run('git', ['add', 'sample.md']);
 		run('sh', ['scripts/check-markdown-line-wrap.sh', 'sample.md']);

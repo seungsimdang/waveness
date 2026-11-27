@@ -113,6 +113,7 @@ function handleSessionStart(input) {
 		cwd: input.cwd || HARNESS_ROOT,
 		encoding: 'utf8'
 	});
+
 	const stdout = (result.stdout ?? '').trim();
 
 	if (!stdout) return {};
@@ -140,6 +141,7 @@ function handlePreToolBash(input, hookName) {
 
 	const args = input.toolCall?.args ?? {};
 	const command = args.CommandLine ?? args.command ?? '';
+
 	const payload = {
 		hook_event_name: 'PreToolUse',
 		tool_name: 'Bash',
@@ -148,6 +150,7 @@ function handlePreToolBash(input, hookName) {
 		transcript_path: resolveTranscriptPath(input.transcriptPath),
 		session_id: input.conversationId ?? ''
 	};
+
 	const result = spawnSync('sh', [script], {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
@@ -198,6 +201,7 @@ function handlePreToolAsk(input, hookName) {
 	if (!script) return { decision: 'allow' };
 
 	const args = input.toolCall?.args ?? {};
+
 	const payload = {
 		hook_event_name: 'PreToolUse',
 		tool_name: 'AskUserQuestion',
@@ -206,6 +210,7 @@ function handlePreToolAsk(input, hookName) {
 		transcript_path: resolveTranscriptPath(input.transcriptPath),
 		session_id: input.conversationId ?? ''
 	};
+
 	const result = spawnSync('sh', [script], {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
@@ -222,6 +227,7 @@ function handlePreToolEdit(input, hookName) {
 	if (!script) return { decision: 'allow' };
 
 	const payload = toEditPayload(input, 'PreToolUse');
+
 	const result = spawnSync('sh', [script], {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
@@ -274,6 +280,7 @@ function handleStop(input, hookName) {
 	if (!script) return { decision: 'allow' };
 
 	const resolvedTranscript = resolveTranscriptPath(input.transcriptPath);
+
 	const payload = {
 		hook_event_name: 'Stop',
 		last_assistant_message:
@@ -283,12 +290,14 @@ function handleStop(input, hookName) {
 		session_id: input.conversationId ?? '',
 		stop_hook_active: Boolean(input.continuationActive)
 	};
+
 	const result = spawnSync('sh', [script], {
 		cwd: input.cwd || HARNESS_ROOT,
 		input: JSON.stringify(payload),
 		encoding: 'utf8',
 		env: { ...process.env, CLAUDE_PROJECT_DIR: HARNESS_ROOT, HARNESS_RUNTIME: 'antigravity' }
 	});
+
 	const stdout = (result.stdout ?? '').trim();
 	const stderr = (result.stderr ?? '').trim();
 	const parsed = parseJsonSafe(stdout);
@@ -323,7 +332,9 @@ function handlePreToolSwarm(input) {
 		.filter(file => file.endsWith('.md'))
 		.map(file => file.slice(0, -3))
 		.sort((a, b) => b.length - a.length);
+
 	const workerName = String(args.name ?? '');
+
 	const matchedRole = roles.find(
 		role =>
 			workerName === role ||

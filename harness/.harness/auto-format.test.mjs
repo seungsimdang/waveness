@@ -133,7 +133,9 @@ test('실제 도구로 저장 버퍼·에이전트 편집을 수정하고 제외
 			[]
 		);
 		symlinkSync(join(source, 'auto-format.mjs'), join(root, 'outside.mjs'));
+
 		const outside = readFileSync(join(source, 'auto-format.mjs'), 'utf8');
+
 		assert.deepEqual(
 			autoFormat({
 				cwd: root,

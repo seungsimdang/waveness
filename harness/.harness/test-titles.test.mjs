@@ -14,6 +14,7 @@ test('한글 제목은 허용하고 플러그인이 영문 설명과 동적 제�
 	skip: !existsSync(join(H, 'node_modules/.bin/biome')) && '프로젝트에 Biome가 설치되지 않음'
 }, () => {
 	const fixture = mkdtempSync(join(tmpdir(), 'portfolio-test-titles-'));
+
 	try {
 		cpSync(join(H, '.harness/korean-test-titles.grit'), join(fixture, 'titles.grit'));
 		writeFileSync(
@@ -24,18 +25,24 @@ test('한글 제목은 허용하고 플러그인이 영문 설명과 동적 제�
 				formatter: { enabled: false }
 			})
 		);
+
 		const check = (body, expected = 0) => {
 			const file = join(fixture, 'fixture.spec.ts');
+
 			writeFileSync(file, body);
+
 			const result = spawnSync(
 				join(H, 'node_modules/.bin/biome'),
 				['lint', `--config-path=${fixture}`, file],
 				{ encoding: 'utf8' }
 			);
+
 			assert.equal(result.status, expected, `${body}\n${result.stdout}\n${result.stderr}`);
 			if (expected) assert.match(result.stderr, /테스트 제목의 설명/);
 		};
+
 		const source = body => `import { test } from '@playwright/test'; ${body}`;
+
 		check(source("test('페이지를 표시한다', () => {});"));
 		check(source('test(`' + '$' + '{path} 페이지를 표시한다`, () => {});'));
 		check(source("test('english', () => {});"), 1);
