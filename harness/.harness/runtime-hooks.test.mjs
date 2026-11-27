@@ -3412,7 +3412,13 @@ test('Codex 종료 훅이 별도 작업 트리에서 검사한 최종 커밋의 
 		return result.stdout.trim();
 	};
 	const git = (cwd, ...args) =>
-		execute(cwd, 'git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args]);
+		execute(cwd, 'git', [
+			'-c',
+			'user.name=Fixture',
+			'-c',
+			'user.email=fixture@example.test',
+			...args
+		]);
 	const lint = 'pnpm exec eslint . --max-warnings 0';
 	const typecheck = 'pnpm exec tsc -b --pretty false';
 
@@ -3467,7 +3473,14 @@ test('Codex 종료 훅이 별도 작업 트리에서 검사한 최종 커밋의 
 	writeFileSync(unstagedInput, 'export const local = true;\n');
 	record(typecheck);
 	rmSync(unstagedInput);
-	execute(worktree, 'python3', [hook, 'verify', '--', 'node', '--test', '.harness/sample.test.mjs']);
+	execute(worktree, 'python3', [
+		hook,
+		'verify',
+		'--',
+		'node',
+		'--test',
+		'.harness/sample.test.mjs'
+	]);
 	git(worktree, 'commit', '-qm', 'header');
 
 	const commit = git(worktree, 'rev-parse', 'HEAD');
@@ -3493,7 +3506,10 @@ test('Codex 종료 훅이 별도 작업 트리에서 검사한 최종 커밋의 
 		assert.deepEqual(result, { snapshot: evidence.committed.snapshot, exit_code: 0 });
 	}
 	assert.match(
-		runGate(repo, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'git commit -m fixture' } }),
+		runGate(repo, 'PreToolUse', {
+			tool_name: 'Bash',
+			tool_input: { command: 'git commit -m fixture' }
+		}),
 		/검증이 끝나지 않았습니다: harness/
 	);
 	assert.equal(stop(repo, 'different-session').committed, undefined);
