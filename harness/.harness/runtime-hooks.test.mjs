@@ -3378,3 +3378,138 @@ test('Codex 검증 훅이 프로젝트 타입 검사와 실행 가능한 테스�
 	record('pnpm test');
 	assert.equal(commit(), '');
 });
+
+test('Codex 종료 훅이 별도 작업 트리에서 검사한 최종 커밋의 근거를 찾는다', () => {
+	const fixture = mkdtempSync(join(marks, 'committed-verification-'));
+	const repo = join(fixture, 'main');
+	const worktree = join(fixture, 'header');
+	const otherRepo = join(fixture, 'other');
+	const requestFile = join(fixture, 'judge-input.json');
+	const judge = join(fixture, 'codex');
+
+	mkdirSync(repo);
+	writeFileSync(
+		judge,
+		'#!/usr/bin/env python3\nimport json, os, pathlib, sys\n' +
+			'pathlib.Path(os.environ["GATE_REQUEST"]).write_text(sys.stdin.read())\n' +
+			'pathlib.Path(sys.argv[sys.argv.index("-o") + 1]).write_text(json.dumps({"block": False, "reason": "fixture"}))\n'
+	);
+	chmodSync(judge, 0o755);
+
+	const gateEnv = {
+		...env,
+		STOP_JUDGE_BIN: '',
+		PATH: `${fixture}:${env.PATH}`,
+		GATE_REQUEST: requestFile,
+		CODEX_WORKFLOW_GATE_DIR: join(fixture, 'state'),
+		CODEX_THREAD_ID: 'worktree-checks'
+	};
+	const hook = resolve(H, '.codex/hooks/workflow-gate.py');
+	const execute = (cwd, binary, args, input) => {
+		const result = spawnSync(binary, args, { cwd, env: gateEnv, encoding: 'utf8', input });
+
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout.trim();
+	};
+	const git = (cwd, ...args) =>
+		execute(cwd, 'git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args]);
+	const lint = 'pnpm exec eslint . --max-warnings 0';
+	const typecheck = 'pnpm exec tsc -b --pretty false';
+
+	git(repo, 'init', '-q');
+	mkdirSync(join(repo, '.harness'));
+	mkdirSync(join(repo, 'src'));
+	writeFileSync(
+		join(repo, '.harness/checks.json'),
+		JSON.stringify({ lint: [lint.split(' ')], typecheck: [typecheck.split(' ')] })
+	);
+	writeFileSync(join(repo, '.harness/sample.test.mjs'), '');
+	writeFileSync(join(repo, 'package.json'), '{"scripts":{}}');
+	writeFileSync(join(repo, 'src/sample.ts'), 'export const value = 1;\n');
+	git(repo, 'add', '.');
+	git(repo, 'commit', '-qm', 'init');
+	git(repo, 'worktree', 'add', '--detach', worktree, 'HEAD');
+
+	const runGate = (cwd, hookEvent, extra = {}) =>
+		execute(
+			cwd,
+			'python3',
+			[hook],
+			JSON.stringify({
+				hook_event_name: hookEvent,
+				cwd,
+				session_id: 'worktree-checks',
+				...extra
+			})
+		);
+	const record = (command, exitCode = 0) => {
+		const event = {
+			tool_name: 'Bash',
+			tool_use_id: command,
+			tool_input: { command }
+		};
+
+		runGate(worktree, 'PreToolUse', event);
+		runGate(worktree, 'PostToolUse', { ...event, tool_response: { exit_code: exitCode } });
+	};
+	const stop = (cwd = repo, session = 'worktree-checks') => {
+		runGate(cwd, 'UserPromptSubmit', { session_id: session, prompt: '최종 커밋을 검증해 보고해' });
+		runGate(cwd, 'Stop', { session_id: session, last_assistant_message: '커밋 검사 통과' });
+		return JSON.parse(readFileSync(requestFile, 'utf8')).verification;
+	};
+
+	writeFileSync(join(worktree, 'src/sample.ts'), 'export const value = 2;\n');
+	git(worktree, 'add', 'src/sample.ts');
+	record(lint);
+
+	const unstagedInput = join(worktree, 'src/local.ts');
+
+	writeFileSync(unstagedInput, 'export const local = true;\n');
+	record(typecheck);
+	rmSync(unstagedInput);
+	execute(worktree, 'python3', [hook, 'verify', '--', 'node', '--test', '.harness/sample.test.mjs']);
+	git(worktree, 'commit', '-qm', 'header');
+
+	const commit = git(worktree, 'rev-parse', 'HEAD');
+
+	git(repo, 'merge', '--ff-only', commit);
+	mkdirSync(join(repo, '.harness/__pycache__'));
+	writeFileSync(join(repo, '.harness/__pycache__/judge_command.cpython-315.pyc'), 'cache');
+	assert.equal(stop().committed, undefined);
+
+	record(typecheck);
+	assert.equal(stop().committed?.commit, commit);
+	record(typecheck, 1);
+	assert.equal(stop().committed, undefined);
+	record(typecheck);
+	git(repo, 'worktree', 'remove', worktree);
+
+	const evidence = stop();
+
+	assert.deepEqual(evidence.missing, ['harness']);
+	assert.equal(evidence.committed.commit, commit);
+	assert.deepEqual(Object.keys(evidence.committed.checks), ['harness', 'lint', 'typecheck']);
+	for (const result of Object.values(evidence.committed.checks)) {
+		assert.deepEqual(result, { snapshot: evidence.committed.snapshot, exit_code: 0 });
+	}
+	assert.match(
+		runGate(repo, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'git commit -m fixture' } }),
+		/검증이 끝나지 않았습니다: harness/
+	);
+	assert.equal(stop(repo, 'different-session').committed, undefined);
+
+	git(repo, 'clone', '-q', repo, otherRepo);
+	assert.equal(stop(otherRepo).committed, undefined);
+
+	const newInput = join(repo, 'src/untracked.ts');
+
+	writeFileSync(newInput, 'export const untracked = true;\n');
+	assert.equal(stop().committed, undefined);
+	rmSync(newInput);
+
+	writeFileSync(join(repo, 'src/sample.ts'), 'export const value = 3;\n');
+	assert.equal(stop().committed, undefined);
+	git(repo, 'add', 'src/sample.ts');
+	git(repo, 'commit', '-qm', 'changed');
+	assert.equal(stop().committed, undefined);
+});
