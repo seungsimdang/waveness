@@ -1,9 +1,6 @@
 {
 	"permissions": {
-		"allow": [
-			"Edit(artifacts/feature-team/**)",
-			"Edit(artifacts/work/**)"
-		],
+		"allow": ["Edit(artifacts/feature-team/**)", "Edit(artifacts/work/**)"],
 		"ask": [
 			"Edit(/.agents/**)",
 			"Edit(/.claude/agents/**)",

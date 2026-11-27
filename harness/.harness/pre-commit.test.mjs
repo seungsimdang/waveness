@@ -163,7 +163,9 @@ test('공유 설정이 없어도 저장소 로컬 신원은 작성자와 커미�
 		GIT_COMMITTER_EMAIL: 'check@example.com'
 	};
 
-	const previousEnv = Object.fromEntries(Object.keys(identityEnv).map(key => [key, process.env[key]]));
+	const previousEnv = Object.fromEntries(
+		Object.keys(identityEnv).map(key => [key, process.env[key]])
+	);
 
 	Object.assign(process.env, identityEnv);
 

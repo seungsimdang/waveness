@@ -1,151 +1,151 @@
 {
-  "harness-guards": {
-    "SessionStart": [
-      {
-        "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" session-start sync"
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "run_command",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-attribution-trailers"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash enforce-commit-msg-style"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash git-safety-guard"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-lint-warnings-on-commit"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-manual-merge-repo"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash require-answer-before-edit"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash require-source-before-best-practice-edit"
-          }
-        ]
-      },
-      {
-        "matcher": "edit_file|write_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit check-branch-guard"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-em-dash-in-source"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-comment-line-wrap"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-coderabbit-run"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-answer-before-edit"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-source-before-best-practice-edit"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-reask-after-free-text-answer"
-          }
-        ]
-      },
-      {
-        "matcher": "run_command|edit_file|write_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-harness-lab-before-harness-edit"
-          }
-        ]
-      },
-      {
-        "matcher": "swarm",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-swarm verify-swarm-role"
-          }
-        ]
-      },
-      {
-        "matcher": "ask_question",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-ask require-answer-before-edit"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-ask block-reask-after-free-text-answer"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "edit_file|write_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" post-tool-edit check-tailwind-source-exclusion"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" post-tool-edit check-agent-harness-sync"
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" post-tool-edit auto-format",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-korean-response"
-      },
-      {
-        "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop block-unverified-claims"
-      },
-      {
-        "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-execution-for-declared-step"
-      },
-      {
-        "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-answer-before-edit"
-      },
-      {
-        "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop block-reask-after-free-text-answer"
-      }
-    ]
-  }
+	"harness-guards": {
+		"SessionStart": [
+			{
+				"type": "command",
+				"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" session-start sync"
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "run_command",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-attribution-trailers"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash enforce-commit-msg-style"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash git-safety-guard"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-lint-warnings-on-commit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash block-manual-merge-repo"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash require-answer-before-edit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-bash require-source-before-best-practice-edit"
+					}
+				]
+			},
+			{
+				"matcher": "edit_file|write_file",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit check-branch-guard"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-em-dash-in-source"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-comment-line-wrap"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-coderabbit-run"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-answer-before-edit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-source-before-best-practice-edit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit block-reask-after-free-text-answer"
+					}
+				]
+			},
+			{
+				"matcher": "run_command|edit_file|write_file",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-edit require-harness-lab-before-harness-edit"
+					}
+				]
+			},
+			{
+				"matcher": "swarm",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-swarm verify-swarm-role"
+					}
+				]
+			},
+			{
+				"matcher": "ask_question",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-ask require-answer-before-edit"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" pre-tool-ask block-reask-after-free-text-answer"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "edit_file|write_file",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" post-tool-edit check-tailwind-source-exclusion"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" post-tool-edit check-agent-harness-sync"
+					},
+					{
+						"type": "command",
+						"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" post-tool-edit auto-format",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"type": "command",
+				"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-korean-response"
+			},
+			{
+				"type": "command",
+				"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop block-unverified-claims"
+			},
+			{
+				"type": "command",
+				"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-execution-for-declared-step"
+			},
+			{
+				"type": "command",
+				"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop require-answer-before-edit"
+			},
+			{
+				"type": "command",
+				"command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/antigravity-hook-adapter.mjs\" stop block-reask-after-free-text-answer"
+			}
+		]
+	}
 }
