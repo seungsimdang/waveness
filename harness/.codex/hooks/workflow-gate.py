@@ -52,7 +52,13 @@ def workspace(root, staged=False):
     if any(p.startswith(('.codex/', '.claude/', '.agents/', '.harness/')) for p in changed):
         required.add('harness')
     if any(p.startswith(('src/', 'tests/', 'scripts/')) or p in ('package.json', 'pnpm-lock.yaml', 'tsconfig.json', 'next.config.ts') for p in changed):
-        required.update(('lint', 'typecheck', 'test'))
+        required.update(('lint', 'typecheck'))
+        manifest = root / 'package.json'
+        scripts = json.loads(manifest.read_text()).get('scripts', {}) if manifest.is_file() else {}
+        if 'test' in scripts or not any((root / '.harness').glob('*.test.mjs')):
+            required.add('test')
+        else:
+            required.add('harness')
     if any(p.endswith('.tsx') or p.startswith('tests/e2e/') for p in changed):
         required.add('e2e')
     if staged and git(root, 'diff', '--name-only', '-z', '--no-ext-diff'):
@@ -90,8 +96,9 @@ def check_kinds(command, root):
     if command in (['pnpm', 'test:e2e'], ['pnpm', 'run', 'test:e2e']):
         return {'e2e'}
     configured = json.loads((root / '.harness/checks.json').read_text()) if (root / '.harness/checks.json').is_file() else {}
-    if command in configured.get('lint', []):
-        return {'lint'}
+    kinds = {kind for kind in ('lint', 'typecheck') if command in configured.get(kind, [])}
+    if kinds:
+        return kinds
     if command[:2] == ['node', '--test']:
         selected = set()
         for name in command[2:]:
@@ -329,7 +336,7 @@ def verify(args):
     root = repository(Path.cwd())
     kinds = check_kinds(command, root)
     if not kinds:
-        raise ValueError('프로젝트 필수 검증 명령이 아닙니다. .harness/checks.json의 lint, pnpm typecheck/test/test:e2e 또는 하네스 전체 테스트를 사용하세요.')
+        raise ValueError('프로젝트 필수 검증 명령이 아닙니다. .harness/checks.json의 lint·typecheck, pnpm typecheck/test/test:e2e 또는 하네스 전체 테스트를 사용하세요.')
     session = args.session or os.environ.get('CODEX_THREAD_ID') or os.environ.get('CODEX_SESSION_ID')
     if not session:
         raise ValueError('검증 근거를 저장할 실제 session 식별자가 필요합니다.')

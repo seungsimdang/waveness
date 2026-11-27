@@ -3300,3 +3300,81 @@ test('판정기 명령은 런타임별 하나로 정하고 effort는 모두 medi
 			agy[agy.indexOf('--effort') + 1] === 'medium'
 	);
 });
+
+test('Codex 검증 훅이 프로젝트 타입 검사와 실행 가능한 테스트를 요구한다', () => {
+	const repo = mkdtempSync(join(marks, 'workflow-gate-'));
+	const git = (...args) => {
+		const result = spawnSync('git', args, { cwd: repo, env, encoding: 'utf8' });
+		assert.equal(result.status, 0, result.stderr);
+	};
+
+	git('init', '-q');
+
+	mkdirSync(join(repo, '.harness'));
+	mkdirSync(join(repo, 'src'));
+
+	const lint = ['pnpm', 'exec', 'eslint', '.', '--max-warnings', '0'];
+	const typecheck = ['pnpm', 'exec', 'tsc', '-b', '--pretty', 'false'];
+	const manifest = join(repo, 'package.json');
+	const source = join(repo, 'src/sample.ts');
+
+	writeFileSync(
+		join(repo, '.harness/checks.json'),
+		JSON.stringify({ lint: [lint], typecheck: [typecheck] })
+	);
+	writeFileSync(join(repo, '.harness/sample.test.mjs'), '');
+	writeFileSync(manifest, JSON.stringify({ scripts: { lint: 'eslint .' } }));
+	git('add', '.harness', 'package.json');
+	git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init');
+
+	writeFileSync(source, 'export const value = 1;\n');
+	git('add', 'src/sample.ts');
+
+	const runGate = (event, command, extra = {}) => {
+		const result = spawnSync('python3', [resolve(H, '.codex/hooks/workflow-gate.py')], {
+			cwd: repo,
+			encoding: 'utf8',
+			env: { ...env, CODEX_WORKFLOW_GATE_DIR: join(marks, 'workflow-gate-state') },
+			input: JSON.stringify({
+				hook_event_name: event,
+				cwd: repo,
+				session_id: 'project-checks',
+				tool_name: 'Bash',
+				tool_input: { command },
+				...extra
+			})
+		});
+
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout;
+	};
+	const record = (command, exitCode = 0) => {
+		const extra = { tool_use_id: command };
+
+		runGate('PreToolUse', command, extra);
+		runGate('PostToolUse', command, { ...extra, tool_response: { exit_code: exitCode } });
+	};
+	const commit = () => runGate('PreToolUse', 'git commit -m fixture');
+	const recordAvailableChecks = () => {
+		record(lint.join(' '));
+		record(typecheck.join(' '));
+		record('node --test .harness/*.test.mjs');
+	};
+
+	assert.match(commit(), /harness, lint, typecheck/);
+	recordAvailableChecks();
+	assert.equal(commit(), '');
+	record(typecheck.join(' '), 1);
+	assert.match(commit(), /typecheck/);
+	record(typecheck.join(' '));
+	writeFileSync(source, 'export const value = 2;\n');
+	git('add', 'src/sample.ts');
+	assert.match(commit(), /harness, lint, typecheck/);
+
+	writeFileSync(manifest, JSON.stringify({ scripts: { test: 'node --test' } }));
+	git('add', 'package.json');
+	recordAvailableChecks();
+	assert.match(commit(), /검증이 끝나지 않았습니다: test/);
+	record('pnpm test');
+	assert.equal(commit(), '');
+});
